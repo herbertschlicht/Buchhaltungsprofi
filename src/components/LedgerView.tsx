@@ -29,12 +29,10 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
   const [balanceDate, setBalanceDate] = useState(lastTransactionDate);
   const [journalYearFilter, setJournalYearFilter] = useState<string>('all');
 
-  // Editing State
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState<AccountType>(AccountType.ASSET);
 
-  // Creating State (New Account)
   const [isCreating, setIsCreating] = useState(false);
   const [newAccountCode, setNewAccountCode] = useState('');
   const [newAccountName, setNewAccountName] = useState('');
@@ -197,7 +195,6 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
   const handleCreateAccount = () => {
       if (!newAccountCode || !newAccountName) return;
       
-      // VALIDIERUNG: Exakt 7 Stellen und nur Zahlen
       if (!/^\d{7}$/.test(newAccountCode)) {
           alert("Die Kontonummer muss exakt 7-stellig sein.");
           return;
