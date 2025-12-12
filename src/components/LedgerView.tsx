@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Transaction, Account, AccountType, CompanySettings, Invoice } from '../types';
 import { Search, PenLine, Check, X, FileSpreadsheet, List, Wallet, Calendar, Printer, Building2, Filter, ArrowLeft, PlusCircle } from 'lucide-react';
@@ -9,7 +10,7 @@ interface LedgerViewProps {
   invoices?: Invoice[];
   companySettings: CompanySettings;
   onUpdateAccount?: (account: Account) => void;
-  onAddAccount?: (account: Account) => void; // New Prop
+  onAddAccount?: (account: Account) => void; 
 }
 
 export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, invoices = [], companySettings, onUpdateAccount, onAddAccount }) => {
@@ -198,7 +199,6 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
       
       // VALIDIERUNG: Exakt 7 Stellen und nur Zahlen
       if (!/^\d{7}$/.test(newAccountCode)) {
-          // Should not happen if button is disabled, but safety check
           alert("Die Kontonummer muss exakt 7-stellig sein.");
           return;
       }
