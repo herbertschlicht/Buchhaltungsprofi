@@ -1,0 +1,5 @@
+{
+  "name": "BuchhaltungsProfi",
+  "description": "Eine umfassende Anwendung für die doppelte Buchführung mit Hauptbuch, Debitoren-/Kreditorenbuchhaltung und Echtzeit-Finanzberichten (Bilanz & GuV), erweitert durch KI-Finanzanalysen.",
+  "requestFramePermissions": []
+}
