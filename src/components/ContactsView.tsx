@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Contact, Transaction, Account, ContactType, Invoice, PurchaseOrder, PurchaseOrderStatus, CompanySettings, Asset } from '../types';
 import { getContactBalance, getInvoicePaymentStatus, getContactLedgerStats } from '../utils/accounting';
@@ -17,7 +18,8 @@ import {
     Calendar,
     Printer,
     Building2,
-    ListChecks
+    ListChecks,
+    TrendingUp
 } from 'lucide-react';
 import { InvoiceForm } from './InvoiceForm';
 import { DunningLetterModal } from './DunningLetterModal';
@@ -94,6 +96,12 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       c.id.includes(searchTerm))
   );
   
+  // Calculate Top 5 Open Contacts
+  const topOpenContacts = balancesList
+      .filter(c => Math.abs(c.endingBalance) > 0.01)
+      .sort((a, b) => Math.abs(b.endingBalance) - Math.abs(a.endingBalance)) // Highest absolute balance first
+      .slice(0, 5);
+
   const masterDataList = relevantContacts.filter(c => 
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
       c.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -289,6 +297,35 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                           >
                               <Users className="w-4 h-4 mr-2"/> Neuer Kontakt anlegen
                           </button>
+                      </div>
+                  </div>
+
+                  {/* NEW: Top Open Items List */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                          <h3 className="text-slate-800 font-bold mb-4 flex items-center">
+                              <TrendingUp className="w-5 h-5 mr-2 text-slate-500"/>
+                              Top 5 {viewMode === 'debtors' ? 'Schuldner (Wer schuldet uns Geld?)' : 'Gläubiger (Wem schulden wir Geld?)'}
+                          </h3>
+                          <div className="space-y-3">
+                              {topOpenContacts.map(c => (
+                                  <div key={c.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                      <div className="flex items-center gap-3 overflow-hidden">
+                                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${viewMode === 'debtors' ? 'bg-blue-400' : 'bg-orange-400'}`}>
+                                              {c.name.substring(0,1)}
+                                          </div>
+                                          <div className="min-w-0">
+                                              <div className="font-bold text-sm text-slate-800 truncate">{c.name}</div>
+                                              <div className="text-xs text-slate-500 font-mono">{c.id}</div>
+                                          </div>
+                                      </div>
+                                      <div className={`font-mono font-bold text-sm ${viewMode === 'debtors' ? 'text-blue-600' : 'text-orange-600'}`}>
+                                          {c.endingBalance.toLocaleString(undefined, {minimumFractionDigits: 2})} €
+                                      </div>
+                                  </div>
+                              ))}
+                              {topOpenContacts.length === 0 && <div className="text-center text-slate-400 text-sm py-4">Alles ausgeglichen. Keine offenen Posten.</div>}
+                          </div>
                       </div>
                   </div>
               </div>
@@ -520,7 +557,6 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                         <button onClick={handlePrint} className="ml-auto text-slate-500 hover:text-blue-600"><Printer className="w-5 h-5"/></button>
                   </div>
                   
-                  {/* ADDED PRINT HEADER FOR BALANCES */}
                   <div className="hidden print:block p-8 pb-0">
                         <div className="flex justify-between items-end border-b-2 border-slate-800 pb-4 mb-4">
                             <div>
@@ -542,7 +578,6 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                         </div>
                   </div>
 
-                  {/* ADDED print:overflow-visible and print:h-auto to allow full list printing */}
                   <div className="overflow-auto flex-1 print:overflow-visible print:h-auto">
                        <table className="w-full text-left">
                            <thead className="bg-slate-100 text-[10px] md:text-xs text-slate-500 uppercase font-semibold sticky top-0 z-10 print:static print:bg-white print:border-b-2 print:border-black">
