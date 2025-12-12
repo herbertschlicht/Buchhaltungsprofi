@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { 
     Users, 
@@ -16,7 +17,10 @@ import {
     ArrowDownCircle,
     ArrowUpCircle,
     Wifi,
-    Bot
+    Bot,
+    Code,
+    Cloud,
+    ExternalLink
 } from 'lucide-react';
 
 interface HomeViewProps {
@@ -94,9 +98,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => 
   ];
 
   return (
-    <div className="space-y-10 animate-fadeIn font-sans pb-12">
+    <div className="space-y-8 animate-fadeIn font-sans pb-12">
       {/* Welcome Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-700 p-10 text-white shadow-xl shadow-blue-900/10">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-700 p-8 md:p-10 text-white shadow-xl shadow-blue-900/10">
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl"></div>
         <div className="relative z-10">
             <div className="flex justify-between items-start">
@@ -107,8 +111,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => 
                         </div>
                         <span className="text-blue-100 font-medium tracking-wide text-sm uppercase flex items-center">
                             Willkommen zurück
-                            <span className="ml-3 bg-green-500/20 text-green-200 text-[10px] px-2 py-0.5 rounded-full border border-green-400/30 flex items-center">
-                                <Wifi className="w-3 h-3 mr-1" /> System: Bereit
+                            <span className="ml-3 bg-green-500/20 text-green-200 text-[10px] px-2 py-0.5 rounded-full border border-green-400/30 flex items-center shadow-sm">
+                                <Wifi className="w-3 h-3 mr-1" /> System Online v1.3
                             </span>
                         </span>
                     </div>
@@ -125,6 +129,32 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => 
                 </div>
             </div>
         </div>
+      </div>
+
+      {/* Info Cards Row (Status & Deployment Help) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4">
+              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl shrink-0">
+                  <Code className="w-6 h-6" />
+              </div>
+              <div>
+                  <h4 className="font-bold text-slate-800 text-sm mb-1">Entwicklungsumgebung</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Ihre App läuft lokal im Vorschau-Modus. Änderungen am Code werden sofort hier angezeigt.
+                  </p>
+              </div>
+          </div>
+          <div className="bg-amber-50 p-5 rounded-2xl border border-amber-200 shadow-sm flex items-start gap-4">
+              <div className="p-3 bg-amber-100 text-amber-700 rounded-xl shrink-0">
+                  <Cloud className="w-6 h-6" />
+              </div>
+              <div>
+                  <h4 className="font-bold text-amber-900 text-sm mb-1">Hinweis zur Bereitstellung</h4>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    Der "Deploy"-Button oben rechts ist für Google Cloud. Für <strong>Netlify</strong>: Speichern Sie auf GitHub und importieren Sie das Projekt dann auf <a href="https://netlify.com" target="_blank" rel="noreferrer" className="underline font-bold hover:text-amber-600">netlify.com</a>.
+                  </p>
+              </div>
+          </div>
       </div>
 
       {/* Grid Menu */}
