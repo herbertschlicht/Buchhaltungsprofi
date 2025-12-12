@@ -20,7 +20,8 @@ import {
     Bot,
     Code,
     Cloud,
-    ExternalLink
+    ExternalLink,
+    Key
 } from 'lucide-react';
 
 interface HomeViewProps {
@@ -33,6 +34,7 @@ interface HomeViewProps {
 
 export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => {
   const [showGuide, setShowGuide] = useState(true);
+  const hasApiKey = !!process.env.API_KEY;
 
   const menuItems = [
     {
@@ -131,6 +133,31 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => 
         </div>
       </div>
 
+      {/* NETLIFY API KEY WARNING */}
+      {!hasApiKey && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 flex flex-col md:flex-row items-start gap-4 shadow-sm animate-pulse">
+            <div className="p-3 bg-red-100 text-red-600 rounded-xl shrink-0">
+                <Key className="w-6 h-6" />
+            </div>
+            <div>
+                <h3 className="text-red-900 font-bold text-lg mb-1">Wichtig: AI-Funktionen konfigurieren (Netlify)</h3>
+                <p className="text-red-800 text-sm leading-relaxed mb-3">
+                    Der API-Schlüssel wurde nicht gefunden. Damit der <strong>AI-Coach</strong> und die <strong>Finanzanalyse</strong> auf der veröffentlichten Webseite funktionieren, müssen Sie dies auf Netlify einstellen:
+                </p>
+                <div className="bg-white/60 rounded-lg p-3 border border-red-100 text-xs text-red-900 font-mono">
+                    <ol className="list-decimal list-inside space-y-2">
+                        <li>Öffnen Sie Ihr Projekt auf <a href="https://app.netlify.com" target="_blank" rel="noreferrer" className="underline font-bold">Netlify</a>.</li>
+                        <li>Gehen Sie zu <strong>Site configuration</strong> &rarr; <strong>Environment variables</strong>.</li>
+                        <li>Klicken Sie auf <strong>Add a variable</strong>.</li>
+                        <li>Key: <strong>API_KEY</strong></li>
+                        <li>Value: <em>(Ihr Google Gemini API Key, beginnt mit AIza...)</em></li>
+                        <li>Wichtig: Starten Sie danach einen neuen Deploy (unter <strong>Deploys</strong> &rarr; <strong>Trigger deploy</strong>).</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Info Cards Row (Status & Deployment Help) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4">
@@ -140,7 +167,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => 
               <div>
                   <h4 className="font-bold text-slate-800 text-sm mb-1">Entwicklungsumgebung</h4>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Ihre App läuft lokal im Vorschau-Modus. Änderungen am Code werden sofort hier angezeigt.
+                    Änderungen am Code werden hier sofort angezeigt. Oben rechts <strong>"Sync to GitHub"</strong> klicken zum Speichern.
                   </p>
               </div>
           </div>
@@ -149,9 +176,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => 
                   <Cloud className="w-6 h-6" />
               </div>
               <div>
-                  <h4 className="font-bold text-amber-900 text-sm mb-1">Hinweis zur Bereitstellung</h4>
+                  <h4 className="font-bold text-amber-900 text-sm mb-1">Bereitstellung auf Netlify</h4>
                   <p className="text-xs text-amber-800 leading-relaxed">
-                    Der "Deploy"-Button oben rechts ist für Google Cloud. Für <strong>Netlify</strong>: Speichern Sie auf GitHub und importieren Sie das Projekt dann auf <a href="https://netlify.com" target="_blank" rel="noreferrer" className="underline font-bold hover:text-amber-600">netlify.com</a>.
+                    Nach dem Import auf Netlify: Sie müssen <strong>keine Domain kaufen</strong>. Klicken Sie im Netlify-Dashboard einfach auf den Link oben links (z.B. <code>xyz.netlify.app</code>), um Ihre App zu öffnen.
                   </p>
               </div>
           </div>
