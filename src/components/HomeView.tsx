@@ -24,8 +24,6 @@ import {
     Key
 } from 'lucide-react';
 
-// WICHTIG: Damit TypeScript beim Build nicht meckert, dass es "process" nicht kennt.
-// Vite ersetzt dies beim Build automatisch.
 declare const process: any;
 
 interface HomeViewProps {
@@ -39,7 +37,6 @@ interface HomeViewProps {
 export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => {
   const [showGuide, setShowGuide] = useState(true);
   
-  // Safe check for API Key
   const hasApiKey = process && process.env && process.env.API_KEY;
 
   const menuItems = [

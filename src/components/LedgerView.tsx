@@ -29,10 +29,12 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
   const [balanceDate, setBalanceDate] = useState(lastTransactionDate);
   const [journalYearFilter, setJournalYearFilter] = useState<string>('all');
 
+  // EDITING STATE
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState<AccountType>(AccountType.ASSET);
 
+  // CREATION STATE
   const [isCreating, setIsCreating] = useState(false);
   const [newAccountCode, setNewAccountCode] = useState('');
   const [newAccountName, setNewAccountName] = useState('');
