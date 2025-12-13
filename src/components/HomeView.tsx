@@ -24,6 +24,9 @@ import {
     Key
 } from 'lucide-react';
 
+// Fix for TypeScript build error: process is not defined in browser context types
+declare const process: any;
+
 interface HomeViewProps {
   setActiveTab: (tab: string) => void;
   metrics: {
@@ -36,7 +39,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => 
   const [showGuide, setShowGuide] = useState(true);
   
   // Vite replaces process.env.API_KEY with the actual string value during build.
-  // We check if that string is truthy. We do NOT check 'process' object directly as it crashes in browser.
+  // We check if that string is truthy.
   const hasApiKey = !!process.env.API_KEY;
 
   const menuItems = [
