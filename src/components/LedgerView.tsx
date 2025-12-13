@@ -303,7 +303,6 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
 
           {activeSubTab === 'balances' && (
               <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
-                    
                     <button 
                         onClick={() => setShowEmptyAccounts(!showEmptyAccounts)}
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border transition-all ${showEmptyAccounts ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'}`}
