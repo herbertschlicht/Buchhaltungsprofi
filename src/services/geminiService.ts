@@ -1,8 +1,12 @@
-import { GoogleGenAI, ChatSession } from "@google/genai";
+
+import { GoogleGenAI, Chat } from "@google/genai";
 import { Transaction, Account, AccountType } from "../types";
+
+declare const process: any;
 
 const apiKey = process.env.API_KEY || '';
 
+// Safely initialize the AI client only if the key exists (handled in UI if missing)
 const getAiClient = () => {
   if (!apiKey) return null;
   return new GoogleGenAI({ apiKey });
@@ -15,6 +19,7 @@ export const generateFinancialInsight = async (
   const ai = getAiClient();
   if (!ai) return "API-Schlüssel fehlt. Bitte konfigurieren Sie Ihre Umgebung.";
 
+  // Summarize data for the prompt to save tokens
   const revenue = transactions.flatMap(t => t.lines).reduce((acc, line) => {
      const account = accounts.find(a => a.id === line.accountId);
      if (account?.type === AccountType.REVENUE) return acc + line.credit;
@@ -66,7 +71,7 @@ export const suggestTransactionCategory = async (description: string): Promise<s
 
 // --- NEW: AI COACH FUNCTIONALITY ---
 
-let chatSession: ChatSession | null = null;
+let chatSession: Chat | null = null;
 
 export const  initializeCoachChat = () => {
     const ai = getAiClient();
@@ -101,7 +106,7 @@ export const sendMessageToCoach = async (message: string): Promise<{ text: strin
     if (!chatSession) return { text: "Fehler: KI nicht initialisiert." };
 
     try {
-        const result = await chatSession.sendMessage(message);
+        const result = await chatSession.sendMessage({ message });
         let text = result.text || "";
         
         // Check for Image Tag
@@ -126,10 +131,8 @@ export const generateCoachImage = async (prompt: string): Promise<string | null>
     if (!ai) return null;
 
     try {
-        // Using imagen model for better quality or flash-image for speed.
-        // Guidelines suggest gemini-2.5-flash-image for general tasks.
         const response = await ai.models.generateImages({
-            model: 'imagen-3.0-generate-001', // Using Imagen for better illustration quality
+            model: 'imagen-3.0-generate-001',
             prompt: `A friendly, clean, educational illustration style: ${prompt}`,
             config: {
                 numberOfImages: 1,
@@ -138,8 +141,11 @@ export const generateCoachImage = async (prompt: string): Promise<string | null>
             }
         });
 
-        if (response.generatedImages && response.generatedImages.length > 0) {
-            return `data:image/jpeg;base64,${response.generatedImages[0].image.imageBytes}`;
+        // Safely access optional properties to prevent build errors
+        const imageBytes = response.generatedImages?.[0]?.image?.imageBytes;
+        
+        if (imageBytes) {
+            return `data:image/jpeg;base64,${imageBytes}`;
         }
         return null;
     } catch (error) {
