@@ -24,8 +24,6 @@ import {
     Key
 } from 'lucide-react';
 
-declare const process: any;
-
 interface HomeViewProps {
   setActiveTab: (tab: string) => void;
   metrics: {
@@ -37,7 +35,9 @@ interface HomeViewProps {
 export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => {
   const [showGuide, setShowGuide] = useState(true);
   
-  const hasApiKey = process && process.env && process.env.API_KEY;
+  // Vite replaces process.env.API_KEY with the actual string value during build.
+  // We check if that string is truthy. We do NOT check 'process' object directly as it crashes in browser.
+  const hasApiKey = !!process.env.API_KEY;
 
   const menuItems = [
     {
