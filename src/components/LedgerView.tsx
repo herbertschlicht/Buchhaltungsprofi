@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Transaction, Account, AccountType, CompanySettings, Invoice } from '../types';
-import { Search, PenLine, Check, X, FileSpreadsheet, List, Wallet, Calendar, Printer, Building2, Filter, ArrowLeft, PlusCircle } from 'lucide-react';
+import { Search, PenLine, Check, X, FileSpreadsheet, List, Wallet, Calendar, Printer, Building2, Filter, AlertTriangle, ArrowLeft, ArrowRight, PlusCircle } from 'lucide-react';
 import { getAccountLedgerStats } from '../utils/accounting';
 
 interface LedgerViewProps {
@@ -10,7 +10,7 @@ interface LedgerViewProps {
   invoices?: Invoice[];
   companySettings: CompanySettings;
   onUpdateAccount?: (account: Account) => void;
-  onAddAccount?: (account: Account) => void; 
+  onAddAccount?: (account: Account) => void;
 }
 
 export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, invoices = [], companySettings, onUpdateAccount, onAddAccount }) => {
@@ -18,8 +18,10 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
   const [searchTerm, setSearchTerm] = useState('');
   const [showEmptyAccounts, setShowEmptyAccounts] = useState(false);
   
+  // Detail View State
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
+  // Calculate Last Transaction Date
   const lastTransactionDate = useMemo(() => {
       if (transactions.length === 0) return new Date().toISOString().split('T')[0];
       const sorted = [...transactions].sort((a,b) => b.date.localeCompare(a.date));
@@ -40,11 +42,13 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
   const [newAccountName, setNewAccountName] = useState('');
   const [newAccountType, setNewAccountType] = useState<AccountType>(AccountType.ASSET);
 
+  // --- Calculate Available Years from Transactions ---
   const availableYears = useMemo(() => {
       const years = new Set<number>(transactions.map(t => new Date(t.date).getFullYear()));
       return Array.from(years).sort((a, b) => b - a);
   }, [transactions]);
 
+  // --- Header Data Logic ---
   const reportDateObj = new Date(balanceDate);
   const reportYear = reportDateObj.getFullYear();
   const reportMonthName = reportDateObj.toLocaleDateString('de-DE', { month: 'long' });
@@ -75,6 +79,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
     a.code.includes(searchTerm)
   ).sort((a, b) => a.code.localeCompare(b.code));
 
+  // --- SuSa Logic ---
   const balancesList = activeSubTab === 'balances' ? accounts.map(account => {
       const stats = getAccountLedgerStats(account.id, transactions, account.type, balanceDate);
       return { ...account, ...stats };
@@ -198,7 +203,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
       if (!newAccountCode || !newAccountName) return;
       
       if (!/^\d{7}$/.test(newAccountCode)) {
-          alert("Die Kontonummer muss exakt 7-stellig sein.");
+          alert("Die Kontonummer muss exakt 7-stellig sein (SKR03 Standard).");
           return;
       }
 
@@ -372,9 +377,6 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
                           {newAccountCode.length > 0 && newAccountCode.length !== 7 && (
                               <p className="text-[10px] text-red-500 mt-1 font-medium">Die Nummer muss exakt 7 Ziffern haben.</p>
                           )}
-                          {newAccountCode.length === 0 && (
-                              <p className="text-[10px] text-slate-400 mt-1">z.B. SKR03 4-stellig + 000 (z.B. 4930 -> 4930000)</p>
-                          )}
                       </div>
                       <div>
                           <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bezeichnung</label>
@@ -416,6 +418,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
           </div>
       )}
 
+      {/* --- JOURNAL TAB --- */}
       {activeSubTab === 'journal' && !selectedAccount && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-y-auto flex-1">
             <table className="w-full text-left border-collapse">
@@ -472,18 +475,12 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
                         </React.Fragment>
                     )
                 })}
-                {filteredTransactions.length === 0 && (
-                    <tr>
-                        <td colSpan={6} className="p-8 text-center text-slate-400">
-                            Keine Transaktionen gefunden. Prüfen Sie den Datumsfilter.
-                        </td>
-                    </tr>
-                )}
             </tbody>
             </table>
         </div>
       )}
 
+      {/* --- ACCOUNTS TAB --- */}
       {activeSubTab === 'accounts' && !selectedAccount && (
          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-y-auto flex-1">
             <table className="w-full text-left border-collapse">
@@ -577,6 +574,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
          </div>
       )}
 
+      {/* --- SUSA (BALANCES) LIST VIEW --- */}
       {activeSubTab === 'balances' && !selectedAccount && (
           <div className="bg-white flex flex-col h-full rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none">
                 
@@ -687,6 +685,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
           </div>
       )}
 
+      {/* --- ACCOUNT SHEET (KONTENBLATT) DETAIL VIEW --- */}
       {selectedAccount && accountSheetData && (
           <div className="bg-white flex flex-col h-full rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none animate-fadeIn">
               
