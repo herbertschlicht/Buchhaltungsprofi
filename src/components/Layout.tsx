@@ -21,7 +21,8 @@ import {
   ChevronsUpDown,
   Check,
   Bot,
-  Target
+  Target,
+  Archive
 } from 'lucide-react';
 import { ClientProfile } from '../types';
 
@@ -60,7 +61,7 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'home', label: 'Startseite', icon: Home },
     { id: 'ai-coach', label: 'AI-Coach', icon: Bot },
     { id: 'analytics', label: 'Finanzanalyse', icon: PieChart },
-    { id: 'controlling', label: 'Controlling / KLR', icon: Target }, // NEW
+    { id: 'controlling', label: 'Controlling / KLR', icon: Target }, 
     { id: 'ledger', label: 'Finanzbuchhaltung', icon: BookOpen },
     { id: 'assets', label: 'Anlagenbuchhaltung', icon: Monitor },
     { id: 'payroll', label: 'Personalwesen', icon: UserCheck },
@@ -68,6 +69,7 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'creditors', label: 'Kreditorenbuchhaltung', icon: Briefcase },
     { id: 'payments', label: 'Zahlungsverkehr', icon: ArrowLeftRight },
     { id: 'reports', label: 'Berichtswesen', icon: FileText },
+    { id: 'closing', label: 'Jahresabschluss', icon: Archive }, // NEW
   ];
 
   return (

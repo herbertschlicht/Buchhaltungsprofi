@@ -1,3 +1,4 @@
+
 import { Account, AccountType } from '../types';
 
 // SKR 03 Standardkontenrahmen (7-stellig)
@@ -110,8 +111,29 @@ export const skr03Accounts: Account[] = [
   { id: '4970000', code: '4970000', name: 'Nebenkosten des Geldverkehrs', type: AccountType.EXPENSE },
   { id: '4980000', code: '4980000', name: 'Betriebsbedarf', type: AccountType.EXPENSE },
 
-  // --- KLASSE 7: ZINSEN & STEUERN ---
-  { id: '7100000', code: '7100000', name: 'Zinserträge', type: AccountType.REVENUE },
-  { id: '7300000', code: '7300000', name: 'Zinsaufwendungen (langfristig)', type: AccountType.EXPENSE },
-  { id: '7310000', code: '7310000', name: 'Zinsaufwendungen (kurzfristig)', type: AccountType.EXPENSE }
+  // Zinsen (Aufwand)
+  { id: '2100000', code: '2100000', name: 'Zinsen und ähnliche Aufwendungen', type: AccountType.EXPENSE }, // SKR03 Class 2, but type Expense
+
+  // --- KLASSE 8: ERLÖSE (UMSATZ) ---
+  { id: '8100000', code: '8100000', name: 'Steuerfreie Umsätze § 4 Nr. 8 ff. UStG', type: AccountType.REVENUE },
+  { id: '8120000', code: '8120000', name: 'Steuerfreie Umsätze § 4 Nr. 1a UStG', type: AccountType.REVENUE },
+  { id: '8200000', code: '8200000', name: 'Erlöse (Umsatzsteuerfrei)', type: AccountType.REVENUE },
+  { id: '8300000', code: '8300000', name: 'Erlöse 7% USt', type: AccountType.REVENUE },
+  { id: '8315000', code: '8315000', name: 'Erlöse aus im Inland steuerpflichtigen EU-Lieferungen 19%', type: AccountType.REVENUE },
+  { id: '8400000', code: '8400000', name: 'Erlöse 19% USt', type: AccountType.REVENUE },
+  { id: '8401000', code: '8401000', name: 'Erlöse aus Beratungsleistungen 19%', type: AccountType.REVENUE },
+  { id: '8519000', code: '8519000', name: 'Provisionserlöse 19% USt', type: AccountType.REVENUE },
+  { id: '8591000', code: '8591000', name: 'Sachbezüge 19% USt (Kfz-Nutzung)', type: AccountType.REVENUE },
+  { id: '8611000', code: '8611000', name: 'Verrechnete sonstige Sachbezüge 19% USt', type: AccountType.REVENUE },
+  { id: '8700000', code: '8700000', name: 'Erlösschmälerungen', type: AccountType.REVENUE }, // Usually debit revenue
+  { id: '8900000', code: '8900000', name: 'Eigenverbrauch (unentgeltliche Wertabgaben)', type: AccountType.REVENUE },
+
+  // --- KLASSE 2/Sonstige: ERTRÄGE (Nicht Umsatz) ---
+  { id: '2700000', code: '2700000', name: 'Sonstige Erträge', type: AccountType.REVENUE },
+  { id: '2650000', code: '2650000', name: 'Zinserträge', type: AccountType.REVENUE },
+
+  // --- KLASSE 9: VORTRAG / ABSCHLUSS ---
+  { id: '9000000', code: '9000000', name: 'Saldenvorträge Sachkonten', type: AccountType.EQUITY },
+  { id: '9008000', code: '9008000', name: 'Saldenvorträge Debitoren', type: AccountType.EQUITY },
+  { id: '9009000', code: '9009000', name: 'Saldenvorträge Kreditoren', type: AccountType.EQUITY },
 ];

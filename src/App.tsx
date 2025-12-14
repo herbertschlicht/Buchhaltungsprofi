@@ -12,7 +12,8 @@ import { SettingsView } from './components/SettingsView';
 import { PaymentsView } from './components/PaymentsView';
 import { AIAssistantView } from './components/AIAssistantView';
 import { TransactionForm } from './components/TransactionForm';
-import { ControllingView } from './components/ControllingView'; // NEW
+import { ControllingView } from './components/ControllingView'; 
+import { ClosingView } from './components/ClosingView'; // NEW
 import { Account, AccountType, Contact, ContactType, Transaction, Invoice, PurchaseOrder, CompanySettings, Asset, TransactionType, ClientProfile, CostCenter, Project, ProjectStatus } from './types';
 import { skr03Accounts } from './data/skr03';
 
@@ -548,6 +549,14 @@ const CompanyWorkspace: React.FC<CompanyWorkspaceProps> = ({ clientId, clients, 
             onUpdateAccount={handleUpdateAccount}
             onAddAccount={handleAddAccount}
           />
+        );
+      case 'closing':
+        return (
+            <ClosingView 
+                transactions={transactions}
+                accounts={accounts}
+                onSaveTransaction={handleSaveTransaction}
+            />
         );
       case 'debtors':
         return (
