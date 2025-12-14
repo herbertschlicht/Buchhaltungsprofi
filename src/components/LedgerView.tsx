@@ -94,14 +94,25 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
       return hasMovement;
   }) : [];
 
-  const totalListStats = balancesList.reduce((acc, c) => ({
-    openingBalance: acc.openingBalance + c.openingBalance,
-    debitMonth: acc.debitMonth + c.debitMonth,
-    creditMonth: acc.creditMonth + c.creditMonth,
-    debitYTD: acc.debitYTD + c.debitYTD,
-    creditYTD: acc.creditYTD + c.creditYTD,
-    endingBalance: acc.endingBalance + c.endingBalance 
-  }), { openingBalance: 0, debitMonth: 0, creditMonth: 0, debitYTD: 0, creditYTD: 0, endingBalance: 0 });
+  // CORRECTION: Calculate Totals correctly by respecting Debit vs Credit accounts
+  const totalListStats = balancesList.reduce((acc, c) => {
+    // Determine if account is naturally Credit-side (Passive/Revenue)
+    // The individual row value 'c.endingBalance' is always positive for its natural side.
+    // To sum them up to a Net Total (Debit - Credit), we subtract Credit accounts.
+    const isCreditSide = [AccountType.LIABILITY, AccountType.EQUITY, AccountType.REVENUE].includes(c.type);
+    
+    const effectiveOpening = isCreditSide ? -c.openingBalance : c.openingBalance;
+    const effectiveEnding = isCreditSide ? -c.endingBalance : c.endingBalance;
+
+    return {
+        openingBalance: acc.openingBalance + effectiveOpening,
+        debitMonth: acc.debitMonth + c.debitMonth,
+        creditMonth: acc.creditMonth + c.creditMonth,
+        debitYTD: acc.debitYTD + c.debitYTD,
+        creditYTD: acc.creditYTD + c.creditYTD,
+        endingBalance: acc.endingBalance + effectiveEnding
+    };
+  }, { openingBalance: 0, debitMonth: 0, creditMonth: 0, debitYTD: 0, creditYTD: 0, endingBalance: 0 });
 
   const accountSheetData = useMemo(() => {
       if (!selectedAccount) return null;
