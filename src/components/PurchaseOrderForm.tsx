@@ -9,7 +9,7 @@ interface PurchaseOrderFormProps {
   contacts: Contact[];
   accounts: Account[]; 
   nextOrderNumber: string;
-  purchaseOrders?: PurchaseOrder[]; // ADDED: Need this to calculate next ID for past years
+  purchaseOrders?: PurchaseOrder[]; 
   onSave: (order: PurchaseOrder, transaction?: Transaction, invoice?: Invoice) => void;
   onClose: () => void;
 }
@@ -38,7 +38,6 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [invoiceAmount, setInvoiceAmount] = useState<number>(0);
-  // Default to Wareneingang 19% in SKR 03 -> 3400000
   const [selectedExpenseAccount, setSelectedExpenseAccount] = useState('3400000'); 
 
   const expenseAccounts = accounts.filter(a => a.type === 'EXPENSE' || a.id.startsWith('0') || a.id.startsWith('3'));
@@ -51,13 +50,11 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({
 
   // --- AUTO NUMBERING ON DATE CHANGE ---
   useEffect(() => {
-      // Only auto-update if we are CREATING a new order, not editing
       if (order) return;
       if (!date) return;
 
       const year = new Date(date).getFullYear();
       const prefix = 'B'; 
-      // Format: B-YYYY-XXX
       
       const relevantOrders = purchaseOrders.filter(po => po.orderNumber.startsWith(`${prefix}-${year}-`));
       
@@ -210,7 +207,8 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({
                                     onChange={(e) => setOrderNumber(e.target.value)}
                                     className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none font-mono bg-slate-50"
                                  />
-                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" title="Passt sich dem Jahr an">
+                                 {/* FIX: Title moved to div and added cursor-help */}
+                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-help" title="Nummer passt sich automatisch dem Jahr an">
                                      <RefreshCw className="w-3 h-3" />
                                  </div>
                              </div>

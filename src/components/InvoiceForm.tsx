@@ -87,8 +87,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
       const year = new Date(date).getFullYear();
       const prefix = isIncoming ? 'ER' : 'RE';
       
-      // Pattern: PREFIX-YEAR-NUMBER
-      // We look for existing invoices in THAT specific year
       const relevantInvoices = invoices.filter(inv => inv.number.startsWith(`${prefix}-${year}-`));
       
       let maxNum = 0;
@@ -109,7 +107,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
       setInvoiceNumber(suggestedNumber);
 
   }, [date, isIncoming, invoices]); 
-  // Dependency on 'invoices' ensures up-to-date calculation, but 'date' is the main trigger.
 
   const taxConfig = isIncoming ? INCOMING_TAX_CONFIG[selectedTaxIndex] : OUTGOING_TAX_CONFIG[selectedTaxIndex];
   const taxAmount = Number((netAmount * (taxConfig.rate / 100)).toFixed(2));
@@ -348,7 +345,8 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                         onChange={(e) => setInvoiceNumber(e.target.value)} 
                         className={`w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium font-mono ${isIncoming ? 'bg-slate-50 text-slate-600' : ''}`}
                     />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400" title="Nummer passt sich automatisch dem Jahr an">
+                    {/* FIX: Title moved to div and added cursor-help */}
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 cursor-help" title="Nummer passt sich automatisch dem Jahr an">
                         <RefreshCw className="w-3 h-3" />
                     </div>
                 </div>
