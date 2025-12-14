@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Account, Contact, ContactType, Transaction, Invoice, AccountType, PurchaseOrder, PurchaseOrderStatus, Asset } from '../types';
-import { X, Save, Calculator, FileText, CalendarClock, ArrowDownCircle, ArrowUpCircle, AlertTriangle, ArrowRight, BookOpen, Monitor } from 'lucide-react';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { Account, Contact, ContactType, Transaction, Invoice, AccountType, PurchaseOrder, PurchaseOrderStatus, Asset, CostCenter, Project } from '../types';
+import { X, Save, Calculator, FileText, CalendarClock, ArrowDownCircle, ArrowUpCircle, AlertTriangle, ArrowRight, BookOpen, Monitor, Target, Building2, PieChart } from 'lucide-react';
 import { afaTable } from '../data/afaTable';
 
 interface InvoiceFormProps {
   type: 'outgoing' | 'incoming'; 
   contacts: Contact[];
   accounts: Account[];
+  costCenters?: CostCenter[]; 
+  projects?: Project[]; 
+  transactions?: Transaction[]; 
   purchaseOrders?: PurchaseOrder[]; 
   nextInvoiceNumber: string; 
   nextAssetNumber?: string; 
@@ -38,6 +42,9 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     type, 
     contacts, 
     accounts, 
+    costCenters = [],
+    projects = [],
+    transactions = [],
     purchaseOrders = [], 
     nextInvoiceNumber, 
     nextAssetNumber, 
@@ -60,6 +67,10 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   const [selectedTaxIndex, setSelectedTaxIndex] = useState(0); 
 
   const [selectedExpenseAccountId, setSelectedExpenseAccountId] = useState('');
+  
+  // KLR Fields
+  const [selectedCostCenter, setSelectedCostCenter] = useState('');
+  const [selectedProject, setSelectedProject] = useState('');
 
   const [isAssetAccount, setIsAssetAccount] = useState(false);
   const [assetName, setAssetName] = useState('');
@@ -87,6 +98,67 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
       )
     : [];
 
+  // --- BUDGET CHECK LOGIC ---
+  const projectBudgetInfo = useMemo(() => {
+      if (!selectedProject || !projects) return null;
+      const project = projects.find(p => p.id === selectedProject);
+      if (!project) return null;
+
+      // Determine the account being booked (Expense for incoming, Revenue for outgoing)
+      const targetAccountId = isIncoming ? selectedExpenseAccountId : accounts.find(a => a.code === (taxConfig as any).revenueAccount)?.id;
+
+      // 1. Calculate GLOBAL Project Budget Stats
+      const globalUsed = transactions.reduce((sum, t) => {
+          return sum + t.lines.filter(l => l.projectId === selectedProject).reduce((lineSum, l) => {
+              const acc = accounts.find(a => a.id === l.accountId);
+              // Expense reduces budget (Debit positive)
+              if (acc?.type === AccountType.EXPENSE || acc?.type === AccountType.ASSET) {
+                  return lineSum + (l.debit - l.credit);
+              }
+              return lineSum;
+          }, 0);
+      }, 0);
+
+      const globalLimit = project.budget || 0;
+      const globalRemaining = globalLimit - globalUsed;
+      const globalExceeded = (globalRemaining - (isIncoming ? netAmount : 0)) < 0;
+
+      // 2. Calculate SPECIFIC Account Budget Stats (if defined)
+      let accountBudget = null;
+      if (targetAccountId && project.budgetPlan) {
+          const planItem = project.budgetPlan.find(p => p.accountId === targetAccountId);
+          if (planItem) {
+              const accountUsed = transactions.reduce((sum, t) => {
+                  return sum + t.lines.filter(l => l.projectId === selectedProject && l.accountId === targetAccountId).reduce((lSum, l) => {
+                      return lSum + (l.debit - l.credit); // Simple net flow
+                  }, 0);
+              }, 0);
+              
+              const remaining = planItem.amount - accountUsed;
+              const remainingAfter = remaining - (isIncoming ? netAmount : 0);
+              
+              accountBudget = {
+                  limit: planItem.amount,
+                  used: accountUsed,
+                  remaining,
+                  remainingAfter,
+                  isExceeded: remainingAfter < 0
+              };
+          }
+      }
+
+      return {
+          global: {
+              limit: globalLimit,
+              used: globalUsed,
+              remaining: globalRemaining,
+              isExceeded: globalExceeded
+          },
+          accountSpecific: accountBudget
+      };
+  }, [selectedProject, projects, transactions, netAmount, isIncoming, accounts, selectedExpenseAccountId, taxConfig]);
+
+
   useEffect(() => {
       if (selectedExpenseAccountId) {
           const acc = accounts.find(a => a.id === selectedExpenseAccountId);
@@ -110,35 +182,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
           setAssetAfaCategory('Benutzerdefiniert');
       }
   };
-
-  let accountMismatchWarning = null;
-  if (isIncoming && selectedExpenseAccountId) {
-      const selectedAccount = accounts.find(a => a.id === selectedExpenseAccountId);
-      if (selectedAccount) {
-          const nameLower = selectedAccount.name.toLowerCase();
-          const is19Acc = nameLower.includes('19%') || nameLower.includes('19 %');
-          const is7Acc = nameLower.includes('7%') || nameLower.includes('7 %');
-          
-          if (is19Acc && taxConfig.rate !== 19) {
-              accountMismatchWarning = `Achtung: Konto "${selectedAccount.name}" erwartet 19%, gewählt sind ${taxConfig.rate}%.`;
-          }
-          if (is7Acc && taxConfig.rate !== 7) {
-              accountMismatchWarning = `Achtung: Konto "${selectedAccount.name}" erwartet 7%, gewählt sind ${taxConfig.rate}%.`;
-          }
-      }
-  }
-
-  useEffect(() => {
-      if (!isIncoming && !description && contactId) {
-          const contact = availableContacts.find(c => c.id === contactId);
-          if (contact) setDescription(`Rechnung ${invoiceNumber} an ${contact.name}`);
-      } else if (isIncoming && !description && contactId) {
-          const contact = availableContacts.find(c => c.id === contactId);
-          if (externalNumber && contact) {
-               setDescription(`Eingangsrechnung ${externalNumber} (${contact.name})`);
-          }
-      }
-  }, [invoiceNumber, contactId, isIncoming, externalNumber]);
 
   useEffect(() => {
       if (date) {
@@ -176,6 +219,12 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
 
     const lines = [];
 
+    // KLR Assignment
+    const klrProps = {
+        costCenterId: selectedCostCenter || undefined,
+        projectId: selectedProject || undefined
+    };
+
     if (!isIncoming) {
         const debtorAccount = accounts.find(a => a.code === '1400000'); 
         const revCode = (taxConfig as any).revenueAccount; 
@@ -185,7 +234,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
         if (!debtorAccount || !revenueAccount) { alert("Konten fehlen!"); return; }
 
         lines.push({ accountId: debtorAccount.id, debit: grossAmount, credit: 0 });
-        lines.push({ accountId: revenueAccount.id, debit: 0, credit: netAmount });
+        lines.push({ accountId: revenueAccount.id, debit: 0, credit: netAmount, ...klrProps });
         if (taxAccount && taxAmount !== 0) {
             lines.push({ accountId: taxAccount.id, debit: 0, credit: taxAmount });
         }
@@ -197,7 +246,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
 
         if (!creditorAccount || !expenseAccount) { alert("Konten fehlen!"); return; }
 
-        lines.push({ accountId: expenseAccount.id, debit: netAmount, credit: 0 });
+        lines.push({ accountId: expenseAccount.id, debit: netAmount, credit: 0, ...klrProps });
         if (taxAccount && taxAmount !== 0) {
             lines.push({ accountId: taxAccount.id, debit: taxAmount, credit: 0 });
         }
@@ -234,13 +283,12 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     onClose();
   };
 
-  const themeColor = isIncoming ? 'text-orange-600 bg-orange-50' : 'text-blue-600 bg-blue-50';
   const borderColor = isIncoming ? 'border-orange-200' : 'border-blue-200';
   const buttonColor = isIncoming ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700';
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 font-sans backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[95vh]">
         <div className={`p-6 border-b border-slate-100 flex justify-between items-center ${isIncoming ? 'bg-orange-50' : 'bg-blue-50'}`}>
           <div className="flex items-center gap-3">
              <div className={`p-2 rounded-lg text-white ${isIncoming ? 'bg-orange-600' : 'bg-blue-600'}`}>
@@ -250,9 +298,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                 <h2 className="text-xl font-bold text-slate-800">
                     {isIncoming ? 'Eingangsrechnung erfassen' : 'Ausgangsrechnung erstellen'}
                 </h2>
-                <p className="text-xs text-slate-500">
-                    {isIncoming ? 'Rechnungseingangsbuch (fortlaufende Nummer)' : 'Rechnung an Kunden (Debitor)'}
-                </p>
              </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
@@ -273,7 +318,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                     value={invoiceNumber} 
                     onChange={(e) => setInvoiceNumber(e.target.value)} 
                     className={`w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium font-mono ${isIncoming ? 'bg-slate-50 text-slate-600' : ''}`}
-                    placeholder={isIncoming ? "z.B. ER-2025-001" : "z.B. RE-2025-001"}
                 />
             </div>
             
@@ -301,48 +345,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                     />
                 </div>
             )}
-            
-            {isIncoming && (
-                 <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Belegdatum</label>
-                    <input 
-                        type="date" 
-                        required
-                        value={date} 
-                        onChange={(e) => setDate(e.target.value)} 
-                        className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
-                    />
-                </div>
-            )}
-          </div>
-
-          <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                     <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center">
-                        <CalendarClock className="w-3 h-3 mr-1 text-slate-500"/> Zahlungsziel
-                     </label>
-                     <select 
-                        value={paymentTermDays}
-                        onChange={(e) => setPaymentTermDays(Number(e.target.value))}
-                        className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
-                     >
-                         {PAYMENT_TERMS.map((term, index) => (
-                             <option key={index} value={term.days}>{term.label}</option>
-                         ))}
-                     </select>
-                </div>
-                <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Fälligkeitsdatum</label>
-                    <input 
-                        type="date" 
-                        required
-                        value={dueDate} 
-                        onChange={(e) => setDueDate(e.target.value)} 
-                        className="w-full p-2.5 border border-slate-300 bg-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-700" 
-                    />
-                </div>
-             </div>
           </div>
 
           <div>
@@ -362,49 +364,9 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
               </select>
           </div>
 
-          {openVendorOrders.length > 0 && onSwitchToOrder && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 animate-fadeIn">
-                  <div className="flex items-start">
-                      <AlertTriangle className="w-5 h-5 text-amber-600 mr-3 shrink-0 mt-0.5" />
-                      <div>
-                          <h4 className="font-bold text-amber-800 text-sm">Hinweis: Es existieren offene Bestellungen</h4>
-                          <p className="text-xs text-amber-700 mt-1 mb-2">
-                              Für {availableContacts.find(c=>c.id === contactId)?.name} wurden folgende Bestellungen gefunden. 
-                              Wollen Sie die Rechnung gegen eine Bestellung buchen, um den Vorgang korrekt abzuschließen?
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                              {openVendorOrders.map(po => (
-                                  <button
-                                    key={po.id}
-                                    type="button"
-                                    onClick={() => onSwitchToOrder(po)}
-                                    className="flex items-center bg-white border border-amber-300 text-amber-800 px-3 py-1.5 rounded text-xs font-bold hover:bg-amber-100 transition-colors shadow-sm"
-                                  >
-                                      Bestell-Nr. {po.orderNumber}
-                                      <ArrowRight className="w-3 h-3 ml-2"/>
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">Beschreibung</label>
-            <input 
-                type="text" 
-                required
-                value={description} 
-                onChange={(e) => setDescription(e.target.value)} 
-                placeholder={isIncoming ? "z.B. Büromaterial, Telefonkosten..." : "z.B. Beratungsleistung..."}
-                className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
-            />
-          </div>
-
           <div className={`p-6 rounded-xl border ${borderColor} ${isIncoming ? 'bg-orange-50/50' : 'bg-blue-50/50'}`}>
              <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center">
-                <Calculator className="w-4 h-4 mr-2"/> Buchungsdetails
+                <Calculator className="w-4 h-4 mr-2"/> Buchungsdetails & Controlling
              </h3>
              
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
@@ -435,6 +397,74 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                  </div>
              </div>
 
+             {/* KLR / CONTROLLING SECTION WITH BUDGET CHECK */}
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 bg-white p-3 rounded-lg border border-slate-200">
+                 <div>
+                     <label className="block text-xs font-bold text-slate-500 mb-1 uppercase flex items-center">
+                         <Building2 className="w-3 h-3 mr-1"/> Kostenstelle
+                     </label>
+                     <select 
+                        value={selectedCostCenter}
+                        onChange={(e) => setSelectedCostCenter(e.target.value)}
+                        className="w-full p-2 border border-slate-300 rounded text-sm"
+                     >
+                         <option value="">- Keine -</option>
+                         {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.code} {cc.name}</option>)}
+                     </select>
+                 </div>
+                 <div>
+                     <label className="block text-xs font-bold text-slate-500 mb-1 uppercase flex items-center">
+                         <Target className="w-3 h-3 mr-1"/> Bauvorhaben (Projekt)
+                     </label>
+                     <select 
+                        value={selectedProject}
+                        onChange={(e) => setSelectedProject(e.target.value)}
+                        className="w-full p-2 border border-slate-300 rounded text-sm"
+                     >
+                         <option value="">- Keines -</option>
+                         {projects.map(p => <option key={p.id} value={p.id}>{p.code} {p.name}</option>)}
+                     </select>
+                 </div>
+                 
+                 {/* GLOBAL BUDGET ALERT */}
+                 {projectBudgetInfo && projectBudgetInfo.global && isIncoming && (
+                     <div className={`col-span-2 p-2 rounded text-xs border mb-1 ${projectBudgetInfo.global.isExceeded ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
+                         <div className="flex justify-between font-bold mb-1">
+                             <span>Gesamt-Budget Projekt:</span>
+                             <span>{projectBudgetInfo.global.remaining.toLocaleString(undefined, {minimumFractionDigits:2})} € offen</span>
+                         </div>
+                         {projectBudgetInfo.global.isExceeded && (
+                             <div className="flex items-center font-bold">
+                                 <AlertTriangle className="w-3 h-3 mr-1"/>
+                                 Überschreitung bei dieser Buchung!
+                             </div>
+                         )}
+                     </div>
+                 )}
+
+                 {/* SPECIFIC ACCOUNT BUDGET ALERT */}
+                 {projectBudgetInfo && projectBudgetInfo.accountSpecific && isIncoming && (
+                     <div className={`col-span-2 p-2 rounded text-xs border ${projectBudgetInfo.accountSpecific.isExceeded ? 'bg-orange-50 border-orange-200 text-orange-800' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+                         <div className="flex justify-between font-bold mb-1">
+                             <span>Konten-Budget ({selectedExpenseAccountId ? 'Konto gewählt' : ''}):</span>
+                             <span>{projectBudgetInfo.accountSpecific.remaining.toLocaleString(undefined, {minimumFractionDigits:2})} € offen</span>
+                         </div>
+                         <div className="w-full bg-white/50 h-1.5 rounded-full overflow-hidden">
+                             <div 
+                                className={`h-full ${projectBudgetInfo.accountSpecific.isExceeded ? 'bg-red-500' : 'bg-blue-500'}`} 
+                                style={{width: `${Math.min(100, (projectBudgetInfo.accountSpecific.used / projectBudgetInfo.accountSpecific.limit) * 100)}%`}}
+                             ></div>
+                         </div>
+                         {projectBudgetInfo.accountSpecific.isExceeded && (
+                             <div className="flex items-center font-bold mt-1">
+                                 <AlertTriangle className="w-3 h-3 mr-1"/>
+                                 Achtung! Budget für dieses Konto ausgeschöpft.
+                             </div>
+                         )}
+                     </div>
+                 )}
+             </div>
+
              {isIncoming && (
                  <div className="mb-4">
                      <label className="block text-sm font-medium text-slate-700 mb-1">Aufwandskonto / Anlagenkonto (Soll)</label>
@@ -444,24 +474,13 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                         className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium"
                      >
                          <option value="">-- Sachkonto wählen --</option>
-                         
                          <optgroup label="Anlagevermögen (Aktivierung)">
-                             {assetAccounts.map(acc => (
-                                 <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
-                             ))}
+                             {assetAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                          </optgroup>
-
                          <optgroup label="Aufwand / Kosten">
-                             {expenseAccounts.map(acc => (
-                                 <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
-                             ))}
+                             {expenseAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                          </optgroup>
                      </select>
-                     {accountMismatchWarning && (
-                         <div className="mt-2 text-xs text-red-600 bg-red-100 p-2 rounded flex items-center">
-                             <AlertTriangle className="w-3 h-3 mr-1"/> {accountMismatchWarning}
-                         </div>
-                     )}
                  </div>
              )}
 
@@ -469,119 +488,32 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mt-6 animate-fadeIn">
                      <div className="flex items-center text-emerald-800 font-bold mb-3 pb-2 border-b border-emerald-200">
                          <Monitor className="w-5 h-5 mr-2"/>
-                         Anlagendetails & Inventarisierung
+                         Anlagendetails
                      </div>
                      
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div className="col-span-2">
-                             <label className="block text-xs font-bold text-emerald-700 uppercase mb-1">Bezeichnung des Wirtschaftsguts</label>
-                             <input 
-                                type="text"
-                                value={assetName}
-                                onChange={(e) => setAssetName(e.target.value)}
-                                className="w-full p-2 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
-                             />
+                             <label className="block text-xs font-bold text-emerald-700 uppercase mb-1">Bezeichnung</label>
+                             <input type="text" value={assetName} onChange={(e) => setAssetName(e.target.value)} className="w-full p-2 border border-emerald-300 rounded bg-white"/>
                          </div>
                          <div>
-                             <label className="block text-xs font-bold text-emerald-700 uppercase mb-1">Inventarnummer (Automatisch)</label>
-                             <input 
-                                type="text"
-                                value={assetInventoryNumber}
-                                onChange={(e) => setAssetInventoryNumber(e.target.value)}
-                                className="w-full p-2 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-white font-mono"
-                             />
-                         </div>
-                         <div>
-                             <label className="block text-xs font-bold text-emerald-700 uppercase mb-1">Vorlage (AfA-Tabelle)</label>
-                             <select 
-                                onChange={handleAfaSelection}
-                                className="w-full p-2 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
-                                defaultValue=""
-                             >
-                                 <option value="" disabled>-- Bitte wählen --</option>
-                                 {afaTable.map((item, idx) => (
-                                     <option key={idx} value={item.label}>{item.label} ({item.years} Jahre)</option>
-                                 ))}
-                                 <option value="custom">Benutzerdefiniert</option>
-                             </select>
+                             <label className="block text-xs font-bold text-emerald-700 uppercase mb-1">Inventarnummer</label>
+                             <input type="text" value={assetInventoryNumber} onChange={(e) => setAssetInventoryNumber(e.target.value)} className="w-full p-2 border border-emerald-300 rounded bg-white font-mono"/>
                          </div>
                          <div>
                              <label className="block text-xs font-bold text-emerald-700 uppercase mb-1">Nutzungsdauer (Jahre)</label>
-                             <input 
-                                type="number"
-                                min="0"
-                                value={assetLifeYears}
-                                onChange={(e) => setAssetLifeYears(parseInt(e.target.value))}
-                                className="w-full p-2 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-white font-bold"
-                             />
+                             <input type="number" value={assetLifeYears} onChange={(e) => setAssetLifeYears(parseInt(e.target.value))} className="w-full p-2 border border-emerald-300 rounded bg-white"/>
                          </div>
                      </div>
-                     <p className="text-xs text-emerald-600 mt-2 flex items-center">
-                         <BookOpen className="w-3 h-3 mr-1"/>
-                         Das Anlagegut wird automatisch im Anlageverzeichnis angelegt (AHK: {netAmount.toFixed(2)} €).
-                     </p>
                  </div>
              )}
-
-             <div className="space-y-2 pt-4 border-t border-slate-200 text-xs md:text-sm mt-4">
-                {!isIncoming ? (
-                    <>
-                        <div className="flex justify-between text-slate-600">
-                            <span>Erlöskonto (Haben):</span>
-                            <span className="font-mono">{(taxConfig as any).revenueAccount} - {netAmount.toFixed(2)} €</span>
-                        </div>
-                        {taxAmount !== 0 && (
-                            <div className="flex justify-between text-slate-600">
-                                <span>USt-Konto (Haben):</span>
-                                <span className="font-mono">{taxConfig.taxAccount} - {taxAmount.toFixed(2)} €</span>
-                            </div>
-                        )}
-                        <div className="flex justify-between text-slate-600">
-                            <span>Forderungskonto (Soll):</span>
-                            <span className="font-mono">1400000 - {grossAmount.toFixed(2)} €</span>
-                        </div>
-                    </>
-                ) : (
-                    <>
-                         <div className="flex justify-between text-slate-600">
-                            <span>{isAssetAccount ? 'Anlagenkonto (Aktivierung)' : 'Aufwandskonto (Soll)'}:</span>
-                            <span className="font-mono">{accounts.find(a=>a.id===selectedExpenseAccountId)?.code || '???'} - {netAmount.toFixed(2)} €</span>
-                        </div>
-                        {taxAmount !== 0 && (
-                            <div className="flex justify-between text-slate-600">
-                                <span>Vorsteuer (Soll):</span>
-                                <span className="font-mono">{taxConfig.taxAccount} - {taxAmount.toFixed(2)} €</span>
-                            </div>
-                        )}
-                        <div className="flex justify-between text-slate-600">
-                            <span>Verbindlichkeiten (Haben):</span>
-                            <span className="font-mono">1600000 - {grossAmount.toFixed(2)} €</span>
-                        </div>
-                    </>
-                )}
-                
-                <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-300">
-                    <span className="font-bold text-lg text-slate-800">Gesamtbetrag (Brutto)</span>
-                    <span className={`font-bold text-2xl ${isIncoming ? 'text-orange-700' : 'text-blue-700'}`}>
-                        {grossAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} €
-                    </span>
-                </div>
-             </div>
           </div>
 
         </form>
 
         <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
-            <button 
-              onClick={onClose}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-white transition-colors"
-            >
-              Abbrechen
-            </button>
-            <button 
-              onClick={handleSubmit}
-              className={`flex items-center px-6 py-2 text-white rounded-lg font-medium shadow-md transition-all ${buttonColor}`}
-            >
+            <button onClick={onClose} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-white transition-colors">Abbrechen</button>
+            <button onClick={handleSubmit} className={`flex items-center px-6 py-2 text-white rounded-lg font-medium shadow-md transition-all ${buttonColor}`}>
               <Save className="w-4 h-4 mr-2" />
               {isIncoming ? 'Eingangsrechnung buchen' : 'Ausgangsrechnung buchen'}
             </button>

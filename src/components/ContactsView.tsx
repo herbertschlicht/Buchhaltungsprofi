@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Contact, Transaction, Account, ContactType, Invoice, PurchaseOrder, PurchaseOrderStatus, CompanySettings, Asset } from '../types';
+import { Contact, Transaction, Account, ContactType, Invoice, PurchaseOrder, PurchaseOrderStatus, CompanySettings, Asset, CostCenter, Project } from '../types';
 import { getContactBalance, getInvoicePaymentStatus, getContactLedgerStats } from '../utils/accounting';
 import { 
     PlusCircle, 
@@ -32,6 +32,9 @@ interface ContactsViewProps {
   accounts: Account[];
   invoices?: Invoice[];
   purchaseOrders?: PurchaseOrder[];
+  // KLR Data needed for InvoiceForm
+  costCenters?: CostCenter[];
+  projects?: Project[];
   companySettings: CompanySettings;
   onSaveInvoice?: (invoice: Invoice, transaction: Transaction, newAsset?: Asset) => void;
   onSavePurchaseOrder?: (order: PurchaseOrder, transaction?: Transaction, invoice?: Invoice) => void;
@@ -49,6 +52,8 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
     accounts, 
     invoices = [],
     purchaseOrders = [],
+    costCenters = [],
+    projects = [],
     companySettings,
     onSaveInvoice,
     onSavePurchaseOrder,
@@ -96,10 +101,9 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       c.id.includes(searchTerm))
   );
   
-  // Calculate Top 5 Open Contacts
   const topOpenContacts = balancesList
       .filter(c => Math.abs(c.endingBalance) > 0.01)
-      .sort((a, b) => Math.abs(b.endingBalance) - Math.abs(a.endingBalance)) // Highest absolute balance first
+      .sort((a, b) => Math.abs(b.endingBalance) - Math.abs(a.endingBalance)) 
       .slice(0, 5);
 
   const masterDataList = relevantContacts.filter(c => 
@@ -160,14 +164,12 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       setDunningModalData(null);
   };
 
-  // Logic for Account Numbering with Prefixes
   const startNumber = viewMode === 'debtors' ? 10000 : 70000;
   const prefix = viewMode === 'debtors' ? 'D' : 'K';
   
   const getNextContactId = () => {
       const existingIds = relevantContacts
         .map(c => {
-            // Strip prefix if exists
             const cleanId = c.id.replace(prefix, '');
             return parseInt(cleanId);
         })
@@ -300,7 +302,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                       </div>
                   </div>
 
-                  {/* NEW: Top Open Items List */}
+                  {/* Top Open Items List */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
                           <h3 className="text-slate-800 font-bold mb-4 flex items-center">
@@ -331,6 +333,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
               </div>
           )}
           
+          {/* ... Other Tabs (OPOS, List, Balances, Invoices, Dunning, Procurement) unchanged in structure but re-rendered ... */}
           {activeTab === 'opos' && (
               <div className="flex flex-col h-full print:block">
                   <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 print:hidden">
@@ -431,6 +434,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
 
           {activeTab === 'procurement' && viewMode === 'creditors' && (
                <div className="flex flex-col h-full">
+                   {/* ... Procurement List Logic ... */}
                    <div className="p-4 border-b border-slate-100 bg-orange-50/30 flex justify-between items-center">
                        <div>
                            <h3 className="font-bold text-orange-900 flex items-center">
@@ -702,6 +706,10 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
             contacts={contacts} 
             accounts={accounts}
             purchaseOrders={purchaseOrders}
+            // Pass KLR and Transaction Data for Budget Check
+            costCenters={costCenters}
+            projects={projects}
+            transactions={transactions}
             nextInvoiceNumber={nextInvoiceNumber}
             onSave={onSaveInvoice}
             onSwitchToOrder={handleSwitchToOrder}

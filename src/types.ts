@@ -22,6 +22,37 @@ export enum TransactionType {
   CREDIT_CARD = 'CREDIT_CARD' // Kreditkartenabrechnung
 }
 
+// --- CONTROLLING / KLR ENTITIES ---
+export interface CostCenter {
+    id: string;
+    code: string; // Nummernkreis z.B. 1000, 2000
+    name: string; // z.B. "Verwaltung", "Fuhrpark"
+    description?: string;
+}
+
+export enum ProjectStatus {
+    PLANNING = 'PLANNING',
+    ACTIVE = 'ACTIVE',
+    COMPLETED = 'COMPLETED'
+}
+
+export interface ProjectBudgetPosition {
+    accountId: string;
+    amount: number;
+}
+
+export interface Project {
+    id: string;
+    code: string; // BV-Nr z.B. BV-2023-001
+    name: string; // z.B. "Neubau Müllerstraße"
+    status: ProjectStatus;
+    startDate: string;
+    endDate?: string;
+    budget?: number; // Gesamtbudget (Fallback oder Summe)
+    budgetPlan?: ProjectBudgetPosition[]; // Detaillierte Budgetierung pro Konto
+    description?: string;
+}
+
 // --- NEU: MANDANTEN-PROFIL ---
 export interface ClientProfile {
     id: string;
@@ -116,6 +147,9 @@ export interface JournalLine {
   accountId: string;
   debit: number;
   credit: number;
+  // KLR ZUORDNUNG
+  costCenterId?: string; // Kostenstelle
+  projectId?: string;    // Kostenträger / BV
 }
 
 export interface Transaction {

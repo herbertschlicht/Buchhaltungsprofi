@@ -1,10 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
-import { Account, Transaction, TransactionType } from '../types';
-import { X, Plus, Trash2, Wand2, Calculator, Tags, Paperclip, FileSpreadsheet, FileText, File as FileIcon } from 'lucide-react';
+import { Account, Transaction, TransactionType, CostCenter, Project, AccountType } from '../types';
+import { X, Plus, Trash2, Wand2, Calculator, Tags, Paperclip, FileSpreadsheet, FileText, File as FileIcon, Building2, Target } from 'lucide-react';
 import { suggestTransactionCategory } from '../services/geminiService';
 
 interface TransactionFormProps {
   accounts: Account[];
+  costCenters?: CostCenter[]; // NEW
+  projects?: Project[]; // NEW
   contacts?: any[]; 
   invoices?: any[]; 
   existingTransactions?: Transaction[]; 
@@ -12,14 +15,21 @@ interface TransactionFormProps {
   onClose: () => void;
 }
 
-export const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, existingTransactions = [], onSave, onClose }) => {
+export const TransactionForm: React.FC<TransactionFormProps> = ({ 
+    accounts, 
+    costCenters = [], 
+    projects = [],
+    existingTransactions = [], 
+    onSave, 
+    onClose 
+}) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [transactionType, setTransactionType] = useState<TransactionType>(TransactionType.STANDARD);
   const [reference, setReference] = useState(''); 
   const [description, setDescription] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
   
-  const [lines, setLines] = useState<{ accountId: string; debit: number; credit: number }[]>([
+  const [lines, setLines] = useState<{ accountId: string; debit: number; credit: number; costCenterId?: string; projectId?: string }[]>([
     { accountId: '', debit: 0, credit: 0 }, 
     { accountId: '', debit: 0, credit: 0 },
   ]);
@@ -33,7 +43,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, exis
       if (transactionType === TransactionType.CLOSING) prefix = 'JAB'; 
       else if (transactionType === TransactionType.CORRECTION) prefix = 'UMB'; 
       else if (transactionType === TransactionType.PAYROLL) prefix = 'LOB';
-      else if (transactionType === TransactionType.CREDIT_CARD) prefix = 'KK'; // Automatisches Präfix für Kreditkarten
+      else if (transactionType === TransactionType.CREDIT_CARD) prefix = 'KK';
 
       const pattern = new RegExp(`^${prefix}-${year}-(\\d+)$`);
       
@@ -74,7 +84,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, exis
     setLines(newLines);
   };
 
-  // Tax Automation Helper (SKR 03)
+  // Tax Automation Helper
   const applyTax = (index: number, taxCodeStr: string) => {
       const [type, rateStr, mode] = taxCodeStr.split('_');
       const rate = parseFloat(rateStr) / 100;
@@ -87,10 +97,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, exis
 
       let taxAccountCode = '';
       if (type === 'vst') { 
-          // SKR 03 Vorsteuer
           taxAccountCode = rateStr === '19' ? '1576000' : '1571000';
       } else { 
-          // SKR 03 Umsatzsteuer
           taxAccountCode = rateStr === '19' ? '1776000' : '1771000';
       }
 
@@ -119,7 +127,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, exis
       const taxLine = {
           accountId: taxAccount.id,
           debit: isDebit ? taxAmount : 0, 
-          credit: !isDebit ? taxAmount : 0 
+          credit: !isDebit ? taxAmount : 0,
+          // Inherit CO objects from base line? Usually Tax has no Cost Center
       };
 
       setLines(prev => {
@@ -169,7 +178,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, exis
       lines: lines.map(l => ({
           accountId: l.accountId,
           debit: Number(l.debit),
-          credit: Number(l.credit)
+          credit: Number(l.credit),
+          costCenterId: l.costCenterId || undefined,
+          projectId: l.projectId || undefined
       }))
     };
     onSave(newTransaction);
@@ -184,7 +195,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, exis
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 font-sans backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl overflow-hidden flex flex-col max-h-[95vh]">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h2 className="text-xl font-bold text-slate-800">Manuelle Buchung (Sachbuchhaltung)</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
@@ -216,10 +227,10 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, exis
                     className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium bg-white"
                 >
                     <option value={TransactionType.STANDARD}>Laufende Buchung (Manuell)</option>
-                    <option value={TransactionType.CREDIT_CARD}>Kreditkartenabrechnung (Sammelbuchung)</option>
+                    <option value={TransactionType.CREDIT_CARD}>Kreditkartenabrechnung</option>
                     <option value={TransactionType.CORRECTION}>Umbuchung / Korrektur</option>
-                    <option value={TransactionType.CLOSING}>Jahresabschluss / Bilanzierung</option>
-                    <option value={TransactionType.PAYROLL}>Lohnbuchhaltung (Manuell)</option>
+                    <option value={TransactionType.CLOSING}>Jahresabschluss</option>
+                    <option value={TransactionType.PAYROLL}>Lohnbuchhaltung</option>
                 </select>
             </div>
 
@@ -262,90 +273,121 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, exis
           </div>
 
           <div className="mb-6">
+            {/* Extended Header for Cost Center / Project */}
             <div className="grid grid-cols-12 gap-4 mb-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
-              <div className="col-span-5 pl-1">Konto (Soll/Haben)</div>
+              <div className="col-span-3 pl-1">Konto</div>
               <div className="col-span-2 text-right">Soll (€)</div>
               <div className="col-span-2 text-right">Haben (€)</div>
-              <div className="col-span-2 pl-2 flex items-center"><Calculator className="w-3 h-3 mr-1"/> Steuer-Automatik</div>
+              <div className="col-span-2 pl-2">Kostenstelle / BV</div>
+              <div className="col-span-2 pl-2 flex items-center"><Calculator className="w-3 h-3 mr-1"/> Steuer</div>
               <div className="col-span-1"></div>
             </div>
             
             <div className="space-y-2">
-                {lines.map((line, index) => (
-                <div key={index} className="grid grid-cols-12 gap-4 items-center bg-white border border-slate-200 p-2 rounded-lg hover:border-blue-300 transition-colors shadow-sm">
-                    <div className="col-span-5">
-                    <select 
-                        value={line.accountId}
-                        onChange={(e) => updateLine(index, 'accountId', e.target.value)}
-                        className="w-full p-2 border-none focus:ring-0 outline-none text-sm font-medium bg-transparent"
-                        required
-                    >
-                        <option value="">-- Konto wählen --</option>
-                        {accounts.map(a => (
-                        <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                        ))}
-                    </select>
-                    </div>
-                    <div className="col-span-2 border-l border-slate-100">
-                    <input 
-                        type="number" 
-                        step="0.01"
-                        value={line.debit || ''}
-                        onChange={(e) => updateLine(index, 'debit', parseFloat(e.target.value))}
-                        className="w-full p-1 text-right text-sm focus:ring-0 outline-none font-mono"
-                        placeholder="0.00"
-                    />
-                    </div>
-                    <div className="col-span-2 border-l border-slate-100">
-                    <input 
-                        type="number" 
-                        step="0.01"
-                        value={line.credit || ''}
-                        onChange={(e) => updateLine(index, 'credit', parseFloat(e.target.value))}
-                        className="w-full p-1 text-right text-sm focus:ring-0 outline-none font-mono"
-                        placeholder="0.00"
-                    />
-                    </div>
-                    
-                    {/* TAX AUTOMATION DROPDOWN */}
-                    <div className="col-span-2 border-l border-slate-100 pl-2">
-                        <select 
-                            className="w-full p-1 text-[10px] border border-slate-200 rounded bg-slate-50 focus:ring-1 focus:ring-blue-500 outline-none text-slate-600"
-                            onChange={(e) => {
-                                if (e.target.value) {
-                                    applyTax(index, e.target.value);
-                                    e.target.value = ""; // Reset after apply
-                                }
-                            }}
-                        >
-                            <option value="">+ Steuer...</option>
-                            <optgroup label="Vorsteuer (Einkauf)">
-                                <option value="vst_19_net">19% auf Netto (Add)</option>
-                                <option value="vst_19_gross">19% aus Brutto (Split)</option>
-                                <option value="vst_7_net">7% auf Netto (Add)</option>
-                                <option value="vst_7_gross">7% aus Brutto (Split)</option>
-                            </optgroup>
-                            <optgroup label="Umsatzsteuer (Verkauf)">
-                                <option value="ust_19_net">19% auf Netto (Add)</option>
-                                <option value="ust_19_gross">19% aus Brutto (Split)</option>
-                                <option value="ust_7_net">7% auf Netto (Add)</option>
-                                <option value="ust_7_gross">7% aus Brutto (Split)</option>
-                            </optgroup>
-                        </select>
-                    </div>
+                {lines.map((line, index) => {
+                    const selectedAcc = accounts.find(a => a.id === line.accountId);
+                    const isPnL = selectedAcc && (selectedAcc.type === AccountType.EXPENSE || selectedAcc.type === AccountType.REVENUE);
 
-                    <div className="col-span-1 flex justify-center border-l border-slate-100">
-                    <button 
-                        type="button" 
-                        onClick={() => handleRemoveLine(index)}
-                        className="text-slate-400 hover:text-red-500 disabled:opacity-30 transition-colors p-1"
-                        disabled={lines.length <= 2}
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
-                    </div>
-                </div>
-                ))}
+                    return (
+                        <div key={index} className="grid grid-cols-12 gap-4 items-start bg-white border border-slate-200 p-2 rounded-lg hover:border-blue-300 transition-colors shadow-sm">
+                            <div className="col-span-3">
+                                <select 
+                                    value={line.accountId}
+                                    onChange={(e) => updateLine(index, 'accountId', e.target.value)}
+                                    className="w-full p-2 border-none focus:ring-0 outline-none text-sm font-medium bg-transparent truncate"
+                                    required
+                                >
+                                    <option value="">-- Konto wählen --</option>
+                                    {accounts.map(a => (
+                                    <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="col-span-2 border-l border-slate-100">
+                                <input 
+                                    type="number" step="0.01" value={line.debit || ''}
+                                    onChange={(e) => updateLine(index, 'debit', parseFloat(e.target.value))}
+                                    className="w-full p-1 text-right text-sm focus:ring-0 outline-none font-mono" placeholder="0.00"
+                                />
+                            </div>
+                            <div className="col-span-2 border-l border-slate-100">
+                                <input 
+                                    type="number" step="0.01" value={line.credit || ''}
+                                    onChange={(e) => updateLine(index, 'credit', parseFloat(e.target.value))}
+                                    className="w-full p-1 text-right text-sm focus:ring-0 outline-none font-mono" placeholder="0.00"
+                                />
+                            </div>
+                            
+                            {/* KLR / CONTROLLING FIELDS */}
+                            <div className="col-span-2 border-l border-slate-100 pl-2 space-y-1">
+                                {isPnL ? (
+                                    <>
+                                        <div className="flex items-center">
+                                            <Building2 className="w-3 h-3 text-slate-400 mr-1"/>
+                                            <select 
+                                                className="w-full text-[10px] bg-transparent outline-none"
+                                                value={line.costCenterId || ''}
+                                                onChange={(e) => updateLine(index, 'costCenterId', e.target.value)}
+                                            >
+                                                <option value="">- KSt wählen -</option>
+                                                {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.code} {cc.name}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="flex items-center">
+                                            <Target className="w-3 h-3 text-rose-400 mr-1"/>
+                                            <select 
+                                                className="w-full text-[10px] bg-transparent outline-none"
+                                                value={line.projectId || ''}
+                                                onChange={(e) => updateLine(index, 'projectId', e.target.value)}
+                                            >
+                                                <option value="">- BV wählen -</option>
+                                                {projects.map(p => <option key={p.id} value={p.id}>{p.code} {p.name}</option>)}
+                                            </select>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="text-[10px] text-slate-300 italic pt-2 pl-1">Keine Kontierung</div>
+                                )}
+                            </div>
+
+                            {/* TAX AUTOMATION DROPDOWN */}
+                            <div className="col-span-2 border-l border-slate-100 pl-2">
+                                <select 
+                                    className="w-full p-1 text-[10px] border border-slate-200 rounded bg-slate-50 focus:ring-1 focus:ring-blue-500 outline-none text-slate-600"
+                                    onChange={(e) => {
+                                        if (e.target.value) {
+                                            applyTax(index, e.target.value);
+                                            e.target.value = ""; 
+                                        }
+                                    }}
+                                >
+                                    <option value="">+ Steuer...</option>
+                                    <optgroup label="Vorsteuer (Einkauf)">
+                                        <option value="vst_19_net">19% auf Netto</option>
+                                        <option value="vst_19_gross">19% aus Brutto</option>
+                                        <option value="vst_7_net">7% auf Netto</option>
+                                        <option value="vst_7_gross">7% aus Brutto</option>
+                                    </optgroup>
+                                    <optgroup label="Umsatzsteuer (Verkauf)">
+                                        <option value="ust_19_net">19% auf Netto</option>
+                                        <option value="ust_19_gross">19% aus Brutto</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+
+                            <div className="col-span-1 flex justify-center border-l border-slate-100 pt-1">
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleRemoveLine(index)}
+                                    className="text-slate-400 hover:text-red-500 disabled:opacity-30 transition-colors p-1"
+                                    disabled={lines.length <= 2}
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
 
             <button 
@@ -357,7 +399,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, exis
             </button>
           </div>
 
-          {/* ATTACHMENTS SECTION */}
           <div className="mt-8 border-t border-slate-100 pt-6">
               <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center">
                   <Paperclip className="w-4 h-4 mr-2"/> Anhänge / Belege
@@ -402,19 +443,14 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, exis
             </div>
           </div>
           <div className="flex justify-end gap-3">
-            <button 
-              onClick={onClose}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-white transition-colors font-medium"
-            >
+            <button onClick={onClose} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-white transition-colors font-medium">
               Abbrechen
             </button>
             <button 
               onClick={handleSubmit}
               disabled={!isBalanced}
               className={`px-8 py-2 rounded-lg text-white font-bold shadow-md transition-all ${
-                isBalanced 
-                  ? 'bg-blue-600 hover:bg-blue-700 hover:-translate-y-0.5' 
-                  : 'bg-slate-300 cursor-not-allowed'
+                isBalanced ? 'bg-blue-600 hover:bg-blue-700 hover:-translate-y-0.5' : 'bg-slate-300 cursor-not-allowed'
               }`}
             >
               Buchen

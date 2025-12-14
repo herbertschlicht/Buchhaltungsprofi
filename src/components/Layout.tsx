@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   LayoutDashboard, 
@@ -19,7 +20,8 @@ import {
   Plus,
   ChevronsUpDown,
   Check,
-  Bot
+  Bot,
+  Target
 } from 'lucide-react';
 import { ClientProfile } from '../types';
 
@@ -44,7 +46,6 @@ export const Layout: React.FC<LayoutProps> = ({
   
   const activeClient = clients.find(c => c.id === activeClientId) || clients[0];
 
-  // Close menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -57,8 +58,9 @@ export const Layout: React.FC<LayoutProps> = ({
 
   const navItems = [
     { id: 'home', label: 'Startseite', icon: Home },
-    { id: 'ai-coach', label: 'AI-Coach (Neu)', icon: Bot }, // Added AI Coach
+    { id: 'ai-coach', label: 'AI-Coach', icon: Bot },
     { id: 'analytics', label: 'Finanzanalyse', icon: PieChart },
+    { id: 'controlling', label: 'Controlling / KLR', icon: Target }, // NEW
     { id: 'ledger', label: 'Finanzbuchhaltung', icon: BookOpen },
     { id: 'assets', label: 'Anlagenbuchhaltung', icon: Monitor },
     { id: 'payroll', label: 'Personalwesen', icon: UserCheck },
@@ -134,7 +136,6 @@ export const Layout: React.FC<LayoutProps> = ({
         <nav className="flex-1 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = activeTab === item.id;
-            // Highlight AI Coach specifically
             const isCoach = item.id === 'ai-coach';
             return (
               <div key={item.id}>

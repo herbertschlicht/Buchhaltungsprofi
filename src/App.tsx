@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
@@ -9,9 +10,10 @@ import { PayrollView } from './components/PayrollView';
 import { HomeView } from './components/HomeView';
 import { SettingsView } from './components/SettingsView';
 import { PaymentsView } from './components/PaymentsView';
-import { AIAssistantView } from './components/AIAssistantView'; // Imported
+import { AIAssistantView } from './components/AIAssistantView';
 import { TransactionForm } from './components/TransactionForm';
-import { Account, AccountType, Contact, ContactType, Transaction, Invoice, PurchaseOrder, CompanySettings, Asset, TransactionType, ClientProfile } from './types';
+import { ControllingView } from './components/ControllingView'; // NEW
+import { Account, AccountType, Contact, ContactType, Transaction, Invoice, PurchaseOrder, CompanySettings, Asset, TransactionType, ClientProfile, CostCenter, Project, ProjectStatus } from './types';
 import { skr03Accounts } from './data/skr03';
 
 // --- INITIAL DATA SEEDING (Defaults for NEW Clients) ---
@@ -41,7 +43,7 @@ const defaultCompanySettings: CompanySettings = {
   }
 };
 
-// Updated to use 'D' (Debitor) and 'K' (Kreditor) prefixes
+// Initial Contacts
 const initialContacts: Contact[] = [
   { 
       id: 'D10000', 
@@ -116,7 +118,21 @@ const initialContacts: Contact[] = [
   }
 ];
 
-// Dummy Transactions updated to SKR03 (7-digit Accounts) & New Contact IDs
+// Initial Cost Centers
+const initialCostCenters: CostCenter[] = [
+    { id: 'cc1', code: '1000', name: 'Verwaltung' },
+    { id: 'cc2', code: '2000', name: 'Vertrieb' },
+    { id: 'cc3', code: '3000', name: 'Fertigung / Baustelle' },
+    { id: 'cc4', code: '4000', name: 'Fuhrpark' }
+];
+
+// Initial Projects
+const initialProjects: Project[] = [
+    { id: 'p1', code: 'BV-2023-001', name: 'Neubau Bürogebäude München', status: ProjectStatus.ACTIVE, startDate: '2023-01-10', budget: 500000 },
+    { id: 'p2', code: 'BV-2023-002', name: 'Sanierung Wohnpark West', status: ProjectStatus.ACTIVE, startDate: '2023-05-01', budget: 150000 }
+];
+
+// Dummy Transactions
 const initialTransactions: Transaction[] = [
   {
     id: 't1',
@@ -125,30 +141,8 @@ const initialTransactions: Transaction[] = [
     reference: 'EB-001',
     description: 'Privateinlage / Startkapital',
     lines: [
-      { accountId: '1200000', debit: 150000, credit: 0 }, // Bank
-      { accountId: '1890000', debit: 0, credit: 150000 }  // Privateinlage
-    ]
-  },
-  {
-    id: 't-asset-1',
-    date: '2023-01-15',
-    type: TransactionType.STANDARD,
-    reference: 'N-K-01',
-    description: 'Kauf Geschäftsgrundstück (Anteil Gebäude)',
-    lines: [
-        { accountId: '0090000', debit: 50000, credit: 0 }, // Geschäftsbauten
-        { accountId: '1200000', debit: 0, credit: 50000 }
-    ]
-  },
-  {
-    id: 't-asset-1b',
-    date: '2023-01-15',
-    type: TransactionType.STANDARD,
-    reference: 'N-K-01-B',
-    description: 'Kauf Geschäftsgrundstück (Anteil Grund & Boden)',
-    lines: [
-        { accountId: '0085000', debit: 30000, credit: 0 }, // Grund und Boden
-        { accountId: '1200000', debit: 0, credit: 30000 }
+      { accountId: '1200000', debit: 150000, credit: 0 }, 
+      { accountId: '1890000', debit: 0, credit: 150000 }  
     ]
   },
   {
@@ -159,7 +153,7 @@ const initialTransactions: Transaction[] = [
     description: 'Mietzahlung Büro',
     contactId: 'K70000', 
     lines: [
-      { accountId: '4200000', debit: 2000, credit: 0 }, // Raumkosten
+      { accountId: '4200000', debit: 2000, credit: 0, costCenterId: 'cc1' }, // Raumkosten -> Verwaltung
       { accountId: '1200000', debit: 0, credit: 2000 }
     ]
   },
@@ -171,9 +165,9 @@ const initialTransactions: Transaction[] = [
     description: 'Ausgangsrechnung #RE-2023-1001 - Beratungsdienstleistungen',
     contactId: 'D10000', 
     lines: [
-      { accountId: '1400000', debit: 5950, credit: 0 }, // Ford. aLL
-      { accountId: '8400000', debit: 0, credit: 5000 }, // Erlöse 19%
-      { accountId: '1776000', debit: 0, credit: 950 }   // USt 19%
+      { accountId: '1400000', debit: 5950, credit: 0 }, 
+      { accountId: '8400000', debit: 0, credit: 5000, projectId: 'p1' }, // Erlöse -> BV-2023-001
+      { accountId: '1776000', debit: 0, credit: 950 }   
     ]
   },
   {
@@ -183,7 +177,7 @@ const initialTransactions: Transaction[] = [
      reference: 'BAR-04',
      description: 'Einkauf Bürobedarf',
      lines: [
-         { accountId: '4930000', debit: 350.50, credit: 0 }, // Bürobedarf
+         { accountId: '4930000', debit: 350.50, credit: 0, costCenterId: 'cc1' }, // Bürobedarf -> Verwaltung
          { accountId: '1200000', debit: 0, credit: 350.50 }
      ]
   },
@@ -193,35 +187,10 @@ const initialTransactions: Transaction[] = [
     type: TransactionType.STANDARD,
     description: 'Kauf Firmenwagen',
     lines: [
-      { accountId: '0320000', debit: 45000, credit: 0 }, // PKW
+      { accountId: '0320000', debit: 45000, credit: 0 }, 
       { accountId: '1200000', debit: 0, credit: 45000 }
     ]
   },
-  // --- KREDITKARTEN BEISPIEL (NEU) ---
-  {
-      id: 't-cc-1',
-      date: '2025-11-20',
-      type: TransactionType.STANDARD,
-      reference: 'CC-NOV-01',
-      description: 'Kreditkartenabrechnung (Hotelübernachtung MA Müller)',
-      lines: [
-          { accountId: '4660000', debit: 200.00, credit: 0 }, // Reisekosten
-          { accountId: '1576000', debit: 38.00, credit: 0 }, // Vorsteuer 19%
-          { accountId: '1220000', debit: 0, credit: 238.00 } // an Verrechnungskonto Kreditkarte (Verbindlichkeit)
-      ]
-  },
-  {
-      id: 't-cc-2',
-      date: '2025-12-02',
-      type: TransactionType.STANDARD,
-      reference: 'BV-CC-NOV',
-      description: 'Abbuchung Kreditkartenabrechnung November durch Bank',
-      lines: [
-          { accountId: '1220000', debit: 238.00, credit: 0 }, // Verrechnungskonto Kreditkarte (Ausgleich)
-          { accountId: '1200000', debit: 0, credit: 238.00 } // an Bank
-      ]
-  },
-  // ------------------------------------
   {
       id: 't-2025-1',
       date: '2025-11-15',
@@ -230,61 +199,14 @@ const initialTransactions: Transaction[] = [
       contactId: 'K70005',
       invoiceId: 'inv-2025-1',
       lines: [
-          { accountId: '0485000', debit: 1000, credit: 0 }, // GWG Sammelposten
-          { accountId: '1576000', debit: 190, credit: 0 },  // Vorsteuer
-          { accountId: '1600000', debit: 0, credit: 1190 }  // Verb. aLL
-      ]
-  },
-  {
-      id: 't-lohn-1',
-      date: '2025-11-28',
-      type: TransactionType.PAYROLL, 
-      reference: 'LOB-2025-11', 
-      description: 'Lohnbuchhaltung 11/2025 (Buchungsliste DATEV/LODAS)',
-      lines: [
-          { accountId: '4100000', debit: 12500.00, credit: 0 }, 
-          { accountId: '4130000', debit: 2600.00, credit: 0 },  
-          { accountId: '1740000', debit: 0, credit: 8200.00 }, 
-          { accountId: '1741000', debit: 0, credit: 2300.00 }, 
-          { accountId: '1742000', debit: 0, credit: 4600.00 }  
-      ]
-  },
-  {
-      id: 't-lohn-pay-1',
-      date: '2025-11-29',
-      type: TransactionType.STANDARD,
-      reference: 'BW-25-1101',
-      description: 'Gehaltszahlungen 11/2025 (Sammelüberweisung)',
-      lines: [
-          { accountId: '1740000', debit: 8200.00, credit: 0 }, 
-          { accountId: '1200000', debit: 0, credit: 8200.00 }  
-      ]
-  },
-  {
-      id: 't-lohn-pay-2',
-      contactId: 'K70091', 
-      date: '2025-11-27', 
-      type: TransactionType.STANDARD,
-      description: 'Beitragsnachweis AOK / SV-Beiträge 11/2025',
-      lines: [
-          { accountId: '1742000', debit: 4600.00, credit: 0 }, 
-          { accountId: '1200000', debit: 0, credit: 4600.00 }
-      ]
-  },
-  {
-      id: 't-lohn-pay-3',
-      contactId: 'K70090', 
-      date: '2025-12-10', 
-      type: TransactionType.STANDARD,
-      description: 'Lohnsteueranmeldung 11/2025',
-      lines: [
-          { accountId: '1741000', debit: 2300.00, credit: 0 }, 
-          { accountId: '1200000', debit: 0, credit: 2300.00 }
+          { accountId: '0485000', debit: 1000, credit: 0, costCenterId: 'cc2' }, // GWG -> Vertrieb
+          { accountId: '1576000', debit: 190, credit: 0 },  
+          { accountId: '1600000', debit: 0, credit: 1190 }  
       ]
   }
 ];
 
-// Initial Assets (SKR 03)
+// Initial Assets
 const initialAssets: Asset[] = [
     {
         id: 'a1-building',
@@ -327,7 +249,7 @@ const initialAssets: Asset[] = [
     }
 ];
 
-// Initial Invoices (Updated Contact IDs)
+// Initial Invoices
 const initialInvoices: Invoice[] = [
     {
         id: 'inv1',
@@ -430,17 +352,29 @@ interface CompanyWorkspaceProps {
 
 const CompanyWorkspace: React.FC<CompanyWorkspaceProps> = ({ clientId, clients, setClients, onSwitchClient, onCreateClient }) => {
   const storagePrefix = clientId === 'default' ? 'bp_' : `bp_${clientId}_`;
+  
+  // DETERMINE if this is the default DEMO client or a new real client
+  const isDemo = clientId === 'default';
 
   const [activeTab, setActiveTab] = useState('home');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   
+  // State Initialization
   const [companySettings, setCompanySettings] = useStickyState<CompanySettings>('settings', defaultCompanySettings, storagePrefix);
-  const [transactions, setTransactions] = useStickyState<Transaction[]>('transactions', initialTransactions, storagePrefix);
-  const [accounts, setAccounts] = useStickyState<Account[]>('accounts', defaultAccounts, storagePrefix);
-  const [contacts, setContacts] = useStickyState<Contact[]>('contacts', initialContacts, storagePrefix);
-  const [invoices, setInvoices] = useStickyState<Invoice[]>('invoices', initialInvoices, storagePrefix);
+  
+  // DATA
+  const [transactions, setTransactions] = useStickyState<Transaction[]>('transactions', isDemo ? initialTransactions : [], storagePrefix);
+  const [contacts, setContacts] = useStickyState<Contact[]>('contacts', isDemo ? initialContacts : [], storagePrefix);
+  const [invoices, setInvoices] = useStickyState<Invoice[]>('invoices', isDemo ? initialInvoices : [], storagePrefix);
   const [purchaseOrders, setPurchaseOrders] = useStickyState<PurchaseOrder[]>('purchaseOrders', [], storagePrefix); 
-  const [assets, setAssets] = useStickyState<Asset[]>('assets', initialAssets, storagePrefix);
+  const [assets, setAssets] = useStickyState<Asset[]>('assets', isDemo ? initialAssets : [], storagePrefix);
+  
+  // KLR DATA
+  const [costCenters, setCostCenters] = useStickyState<CostCenter[]>('costcenters', isDemo ? initialCostCenters : [], storagePrefix);
+  const [projects, setProjects] = useStickyState<Project[]>('projects', isDemo ? initialProjects : [], storagePrefix);
+
+  // ACCOUNTS: Always load SKR03 for everyone
+  const [accounts, setAccounts] = useStickyState<Account[]>('accounts', defaultAccounts, storagePrefix);
 
   const currentYear = new Date().getFullYear();
   const [nextInvoiceNum, setNextInvoiceNum] = useStickyState<string>('nextInvoiceNum', `RE-${currentYear}-1001`, storagePrefix);
@@ -545,6 +479,31 @@ const CompanyWorkspace: React.FC<CompanyWorkspaceProps> = ({ clientId, clients, 
       setCompanySettings(newSettings);
   };
 
+  // KLR Handlers
+  const handleSaveCostCenter = (cc: CostCenter) => {
+      setCostCenters(prev => [...prev, cc]);
+  };
+
+  const handleUpdateCostCenter = (updatedCC: CostCenter) => {
+      setCostCenters(prev => prev.map(c => c.id === updatedCC.id ? updatedCC : c));
+  };
+  
+  const handleSaveProject = (proj: Project) => {
+      setProjects(prev => [...prev, proj]);
+  };
+
+  const handleUpdateProject = (updatedProj: Project) => {
+      setProjects(prev => prev.map(p => p.id === updatedProj.id ? updatedProj : p));
+  };
+
+  const handleDeleteCostCenter = (id: string) => {
+      if(window.confirm('Kostenstelle wirklich löschen? Dies kann nicht rückgängig gemacht werden.')) setCostCenters(prev => prev.filter(c => c.id !== id));
+  }
+
+  const handleDeleteProject = (id: string) => {
+      if(window.confirm('Bauvorhaben/Projekt wirklich löschen? Dies kann nicht rückgängig gemacht werden.')) setProjects(prev => prev.filter(p => p.id !== id));
+  }
+
   const handleResetData = () => {
       if(window.confirm("ACHTUNG: Alle Daten DIESES MANDANTEN wirklich löschen?")) {
         Object.keys(localStorage).forEach(key => {
@@ -560,10 +519,25 @@ const CompanyWorkspace: React.FC<CompanyWorkspaceProps> = ({ clientId, clients, 
     switch (activeTab) {
       case 'home':
         return <HomeView setActiveTab={setActiveTab} metrics={{ netIncome, pendingTasks: 0 }} />;
-      case 'ai-coach': // Added Routing
+      case 'ai-coach': 
         return <AIAssistantView />;
       case 'analytics':
         return <Dashboard transactions={transactions} accounts={accounts} />;
+      case 'controlling':
+        return (
+            <ControllingView 
+                costCenters={costCenters}
+                projects={projects}
+                transactions={transactions}
+                accounts={accounts}
+                onSaveCostCenter={handleSaveCostCenter}
+                onUpdateCostCenter={handleUpdateCostCenter}
+                onSaveProject={handleSaveProject}
+                onUpdateProject={handleUpdateProject}
+                onDeleteCostCenter={handleDeleteCostCenter}
+                onDeleteProject={handleDeleteProject}
+            />
+        );
       case 'ledger':
         return (
           <LedgerView 
@@ -584,6 +558,9 @@ const CompanyWorkspace: React.FC<CompanyWorkspaceProps> = ({ clientId, clients, 
                 accounts={accounts} 
                 invoices={invoices}
                 companySettings={companySettings}
+                // Pass KLR data to InvoiceForm via ContactsView
+                costCenters={costCenters}
+                projects={projects}
                 onSaveInvoice={handleSaveInvoice}
                 onUpdateInvoice={handleUpdateInvoice}
                 onAddContact={handleAddContact}
@@ -599,6 +576,9 @@ const CompanyWorkspace: React.FC<CompanyWorkspaceProps> = ({ clientId, clients, 
                 accounts={accounts} 
                 invoices={invoices}
                 companySettings={companySettings}
+                // Pass KLR data to InvoiceForm via ContactsView
+                costCenters={costCenters}
+                projects={projects}
                 purchaseOrders={purchaseOrders} 
                 onSavePurchaseOrder={handleSavePurchaseOrder} 
                 onSaveInvoice={handleSaveInvoice}
@@ -662,6 +642,8 @@ const CompanyWorkspace: React.FC<CompanyWorkspaceProps> = ({ clientId, clients, 
       {showTransactionModal && (
         <TransactionForm 
           accounts={accounts}
+          costCenters={costCenters}
+          projects={projects}
           contacts={contacts}
           invoices={invoices}
           existingTransactions={transactions}
@@ -682,18 +664,19 @@ const AppController: React.FC = () => {
             const stored = localStorage.getItem('bp_clients');
             if (stored) return JSON.parse(stored);
             
+            // Legacy Migration
             const legacySettings = localStorage.getItem('bp_settings');
-            let defaultName = 'Meine Firma GmbH';
+            let defaultName = 'Meine Firma GmbH (Demo)';
             if (legacySettings) {
                 try {
                     const parsed = JSON.parse(legacySettings);
-                    if (parsed.companyName) defaultName = parsed.companyName;
+                    if (parsed.companyName) defaultName = parsed.companyName + ' (Demo)';
                 } catch(e) {}
             }
 
             return [{ id: 'default', name: defaultName, created: new Date().toISOString() }];
         } catch (e) {
-            return [{ id: 'default', name: 'Meine Firma GmbH', created: new Date().toISOString() }];
+            return [{ id: 'default', name: 'Meine Firma GmbH (Demo)', created: new Date().toISOString() }];
         }
     });
 
@@ -713,20 +696,21 @@ const AppController: React.FC = () => {
     const handleCreateClient = (name: string) => {
         const newId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
         const newClient: ClientProfile = { id: newId, name, created: new Date().toISOString() };
-        setClients(prev => [...prev, newClient]);
-        setActiveClientId(newId);
         
+        // Save initial settings for this client to name it correctly immediately
         const prefix = `bp_${newId}_`;
         const settings: CompanySettings = { ...defaultCompanySettings, companyName: name };
         localStorage.setItem(prefix + 'settings', JSON.stringify(settings));
-        
+
+        setClients(prev => [...prev, newClient]);
+        setActiveClientId(newId);
         setShowCreateModal(false);
     };
 
     return (
         <>
             <CompanyWorkspace 
-                key={activeClientId} 
+                key={activeClientId} // Important: Force remount on switch
                 clientId={activeClientId} 
                 clients={clients}
                 setClients={setClients}
