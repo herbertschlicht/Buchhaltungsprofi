@@ -302,7 +302,6 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                       </div>
                   </div>
 
-                  {/* Top Open Items List */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
                           <h3 className="text-slate-800 font-bold mb-4 flex items-center">
@@ -333,7 +332,6 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
               </div>
           )}
           
-          {/* ... Other Tabs (OPOS, List, Balances, Invoices, Dunning, Procurement) unchanged in structure but re-rendered ... */}
           {activeTab === 'opos' && (
               <div className="flex flex-col h-full print:block">
                   <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 print:hidden">
@@ -434,7 +432,6 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
 
           {activeTab === 'procurement' && viewMode === 'creditors' && (
                <div className="flex flex-col h-full">
-                   {/* ... Procurement List Logic ... */}
                    <div className="p-4 border-b border-slate-100 bg-orange-50/30 flex justify-between items-center">
                        <div>
                            <h3 className="font-bold text-orange-900 flex items-center">
@@ -706,6 +703,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
             contacts={contacts} 
             accounts={accounts}
             purchaseOrders={purchaseOrders}
+            invoices={invoices} // ADDED
             // Pass KLR and Transaction Data for Budget Check
             costCenters={costCenters}
             projects={projects}
@@ -733,6 +731,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
               contacts={contacts}
               accounts={accounts}
               nextOrderNumber={nextOrderNumber}
+              purchaseOrders={purchaseOrders} // ADDED
               onSave={onSavePurchaseOrder}
               onClose={() => { setShowOrderForm(false); setSelectedOrder(undefined); }}
           />

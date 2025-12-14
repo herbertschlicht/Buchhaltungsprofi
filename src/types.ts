@@ -15,6 +15,7 @@ export enum ContactType {
 // NEW: Transaction Types for better categorization
 export enum TransactionType {
   STANDARD = 'STANDARD',   // Normale Rechnung / Zahlung
+  OPENING_BALANCE = 'OPENING_BALANCE', // NEU: Eröffnungsbilanzbuchung / Vortrag
   PAYROLL = 'PAYROLL',     // Lohn & Gehalt
   CLOSING = 'CLOSING',     // Jahresabschluss
   CORRECTION = 'CORRECTION', // Umbuchung

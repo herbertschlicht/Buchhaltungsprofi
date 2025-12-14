@@ -6,8 +6,8 @@ import { suggestTransactionCategory } from '../services/geminiService';
 
 interface TransactionFormProps {
   accounts: Account[];
-  costCenters?: CostCenter[]; // NEW
-  projects?: Project[]; // NEW
+  costCenters?: CostCenter[]; 
+  projects?: Project[]; 
   contacts?: any[]; 
   invoices?: any[]; 
   existingTransactions?: Transaction[]; 
@@ -41,10 +41,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       let prefix = 'MAN'; 
       
       if (transactionType === TransactionType.CLOSING) prefix = 'JAB'; 
+      else if (transactionType === TransactionType.OPENING_BALANCE) prefix = 'EB';
       else if (transactionType === TransactionType.CORRECTION) prefix = 'UMB'; 
       else if (transactionType === TransactionType.PAYROLL) prefix = 'LOB';
       else if (transactionType === TransactionType.CREDIT_CARD) prefix = 'KK';
 
+      // For EB, we often just use EB-YEAR without sequence, but sequence is safer
       const pattern = new RegExp(`^${prefix}-${year}-(\\d+)$`);
       
       let maxSeq = 0;
@@ -62,6 +64,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       const nextRef = `${prefix}-${year}-${nextSeq.toString().padStart(3, '0')}`;
       
       setReference(nextRef);
+      
+      // Auto-set description for Opening Balance
+      if (transactionType === TransactionType.OPENING_BALANCE && !description) {
+          setDescription('Eröffnungsbilanzbuchung / Saldovortrag');
+      }
 
   }, [transactionType, date, existingTransactions]);
 
@@ -227,6 +234,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                     className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium bg-white"
                 >
                     <option value={TransactionType.STANDARD}>Laufende Buchung (Manuell)</option>
+                    <option value={TransactionType.OPENING_BALANCE}>Eröffnungsbilanz / Vortrag (EB)</option>
                     <option value={TransactionType.CREDIT_CARD}>Kreditkartenabrechnung</option>
                     <option value={TransactionType.CORRECTION}>Umbuchung / Korrektur</option>
                     <option value={TransactionType.CLOSING}>Jahresabschluss</option>

@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { PurchaseOrder, PurchaseOrderStatus, Contact, Account, Transaction, Invoice } from '../types';
-import { X, ArrowRight, FileText, CheckCircle, AlertTriangle, Truck, ShoppingCart, Save } from 'lucide-react';
+import { X, ArrowRight, FileText, CheckCircle, AlertTriangle, Truck, ShoppingCart, Save, RefreshCw } from 'lucide-react';
 
 interface PurchaseOrderFormProps {
   order?: PurchaseOrder; 
@@ -8,6 +9,7 @@ interface PurchaseOrderFormProps {
   contacts: Contact[];
   accounts: Account[]; 
   nextOrderNumber: string;
+  purchaseOrders?: PurchaseOrder[]; // ADDED: Need this to calculate next ID for past years
   onSave: (order: PurchaseOrder, transaction?: Transaction, invoice?: Invoice) => void;
   onClose: () => void;
 }
@@ -18,6 +20,7 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({
     contacts, 
     accounts,
     nextOrderNumber, 
+    purchaseOrders = [],
     onSave, 
     onClose 
 }) => {
@@ -45,6 +48,32 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({
           setInvoiceAmount(order.netAmount); 
       }
   }, [order]);
+
+  // --- AUTO NUMBERING ON DATE CHANGE ---
+  useEffect(() => {
+      // Only auto-update if we are CREATING a new order, not editing
+      if (order) return;
+      if (!date) return;
+
+      const year = new Date(date).getFullYear();
+      const prefix = 'B'; 
+      // Format: B-YYYY-XXX
+      
+      const relevantOrders = purchaseOrders.filter(po => po.orderNumber.startsWith(`${prefix}-${year}-`));
+      
+      let maxNum = 0;
+      relevantOrders.forEach(po => {
+          const parts = po.orderNumber.split('-');
+          const numPart = parseInt(parts[parts.length - 1]);
+          if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
+      });
+
+      const nextNum = maxNum + 1;
+      const suggestedNumber = `${prefix}-${year}-${nextNum.toString().padStart(3, '0')}`;
+      
+      setOrderNumber(suggestedNumber);
+
+  }, [date, order, purchaseOrders]);
 
   const handleSave = () => {
       if (!selectedContactId || !description) return;
@@ -102,7 +131,6 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({
       };
       
       if (taxRate > 0) {
-          // SKR 03 Vorsteuer: 1576 (19%), 1571 (7%)
           const taxAccCode = taxRate === 19 ? '1576000' : '1571000';
           const taxAcc = accounts.find(a => a.code === taxAccCode);
           if (taxAcc) {
@@ -175,12 +203,17 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({
                         </div>
                         <div>
                              <label className="block text-sm font-medium text-slate-700 mb-1">Interne Bestellnummer</label>
-                             <input 
-                                type="text" 
-                                value={orderNumber} 
-                                onChange={(e) => setOrderNumber(e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none font-mono bg-slate-50"
-                             />
+                             <div className="relative">
+                                 <input 
+                                    type="text" 
+                                    value={orderNumber} 
+                                    onChange={(e) => setOrderNumber(e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none font-mono bg-slate-50"
+                                 />
+                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+                                     <RefreshCw className="w-3 h-3" title="Passt sich dem Jahr an" />
+                                 </div>
+                             </div>
                         </div>
                     </div>
 

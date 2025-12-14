@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Account, Contact, ContactType, Transaction, Invoice, AccountType, PurchaseOrder, PurchaseOrderStatus, Asset, CostCenter, Project } from '../types';
-import { X, Save, Calculator, FileText, CalendarClock, ArrowDownCircle, ArrowUpCircle, AlertTriangle, ArrowRight, BookOpen, Monitor, Target, Building2, PieChart } from 'lucide-react';
+import { X, Save, Calculator, FileText, CalendarClock, ArrowDownCircle, ArrowUpCircle, AlertTriangle, ArrowRight, BookOpen, Monitor, Target, Building2, PieChart, RefreshCw } from 'lucide-react';
 import { afaTable } from '../data/afaTable';
 
 interface InvoiceFormProps {
@@ -12,6 +12,7 @@ interface InvoiceFormProps {
   projects?: Project[]; 
   transactions?: Transaction[]; 
   purchaseOrders?: PurchaseOrder[]; 
+  invoices?: Invoice[]; // ADDED: Needed to calculate next number dynamically based on date
   nextInvoiceNumber: string; 
   nextAssetNumber?: string; 
   onSave: (invoice: Invoice, transaction: Transaction, newAsset?: Asset) => void;
@@ -45,7 +46,8 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     costCenters = [],
     projects = [],
     transactions = [],
-    purchaseOrders = [], 
+    purchaseOrders = [],
+    invoices = [], 
     nextInvoiceNumber, 
     nextAssetNumber, 
     onSave, 
@@ -54,10 +56,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
 }) => {
   const isIncoming = type === 'incoming';
 
+  // Form State
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [invoiceNumber, setInvoiceNumber] = useState(nextInvoiceNumber);
   const [externalNumber, setExternalNumber] = useState(''); 
   
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentTermDays, setPaymentTermDays] = useState(0); 
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -77,6 +80,36 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   const [assetLifeYears, setAssetLifeYears] = useState(3);
   const [assetAfaCategory, setAssetAfaCategory] = useState('');
   const [assetInventoryNumber, setAssetInventoryNumber] = useState(nextAssetNumber || ''); 
+
+  // --- INTELLIGENT AUTO-NUMBERING BASED ON DATE ---
+  useEffect(() => {
+      if (!date) return;
+      const year = new Date(date).getFullYear();
+      const prefix = isIncoming ? 'ER' : 'RE';
+      
+      // Pattern: PREFIX-YEAR-NUMBER
+      // We look for existing invoices in THAT specific year
+      const relevantInvoices = invoices.filter(inv => inv.number.startsWith(`${prefix}-${year}-`));
+      
+      let maxNum = 0;
+      if (relevantInvoices.length > 0) {
+          relevantInvoices.forEach(inv => {
+              const parts = inv.number.split('-');
+              const numPart = parseInt(parts[parts.length - 1]);
+              if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
+          });
+      } else {
+          // If no invoices for that year yet, start at 1001 (or 001 for incoming)
+          maxNum = isIncoming ? 0 : 1000;
+      }
+
+      const nextNum = maxNum + 1;
+      const suggestedNumber = `${prefix}-${year}-${nextNum.toString().padStart(3, '0')}`;
+      
+      setInvoiceNumber(suggestedNumber);
+
+  }, [date, isIncoming, invoices]); 
+  // Dependency on 'invoices' ensures up-to-date calculation, but 'date' is the main trigger.
 
   const taxConfig = isIncoming ? INCOMING_TAX_CONFIG[selectedTaxIndex] : OUTGOING_TAX_CONFIG[selectedTaxIndex];
   const taxAmount = Number((netAmount * (taxConfig.rate / 100)).toFixed(2));
@@ -104,14 +137,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
       const project = projects.find(p => p.id === selectedProject);
       if (!project) return null;
 
-      // Determine the account being booked (Expense for incoming, Revenue for outgoing)
       const targetAccountId = isIncoming ? selectedExpenseAccountId : accounts.find(a => a.code === (taxConfig as any).revenueAccount)?.id;
 
-      // 1. Calculate GLOBAL Project Budget Stats
       const globalUsed = transactions.reduce((sum, t) => {
           return sum + t.lines.filter(l => l.projectId === selectedProject).reduce((lineSum, l) => {
               const acc = accounts.find(a => a.id === l.accountId);
-              // Expense reduces budget (Debit positive)
               if (acc?.type === AccountType.EXPENSE || acc?.type === AccountType.ASSET) {
                   return lineSum + (l.debit - l.credit);
               }
@@ -123,14 +153,13 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
       const globalRemaining = globalLimit - globalUsed;
       const globalExceeded = (globalRemaining - (isIncoming ? netAmount : 0)) < 0;
 
-      // 2. Calculate SPECIFIC Account Budget Stats (if defined)
       let accountBudget = null;
       if (targetAccountId && project.budgetPlan) {
           const planItem = project.budgetPlan.find(p => p.accountId === targetAccountId);
           if (planItem) {
               const accountUsed = transactions.reduce((sum, t) => {
                   return sum + t.lines.filter(l => l.projectId === selectedProject && l.accountId === targetAccountId).reduce((lSum, l) => {
-                      return lSum + (l.debit - l.credit); // Simple net flow
+                      return lSum + (l.debit - l.credit); 
                   }, 0);
               }, 0);
               
@@ -219,7 +248,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
 
     const lines = [];
 
-    // KLR Assignment
     const klrProps = {
         costCenterId: selectedCostCenter || undefined,
         projectId: selectedProject || undefined
@@ -266,7 +294,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     if (isIncoming && isAssetAccount) {
         newAsset = {
             id: crypto.randomUUID(),
-            inventoryNumber: assetInventoryNumber || `INV-${new Date().getFullYear()}-AUTO`, 
+            inventoryNumber: assetInventoryNumber || `INV-${new Date(date).getFullYear()}-AUTO`, 
             name: assetName || description,
             glAccountId: selectedExpenseAccountId,
             purchaseDate: date,
@@ -312,13 +340,18 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                 <label className="block text-sm font-semibold text-slate-700 mb-1">
                     {isIncoming ? 'Interne Beleg-Nr. (ER)' : 'Rechnungs-Nr.'}
                 </label>
-                <input 
-                    type="text" 
-                    required
-                    value={invoiceNumber} 
-                    onChange={(e) => setInvoiceNumber(e.target.value)} 
-                    className={`w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium font-mono ${isIncoming ? 'bg-slate-50 text-slate-600' : ''}`}
-                />
+                <div className="relative">
+                    <input 
+                        type="text" 
+                        required
+                        value={invoiceNumber} 
+                        onChange={(e) => setInvoiceNumber(e.target.value)} 
+                        className={`w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium font-mono ${isIncoming ? 'bg-slate-50 text-slate-600' : ''}`}
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                        <RefreshCw className="w-3 h-3" title="Nummer passt sich automatisch dem Jahr an" />
+                    </div>
+                </div>
             </div>
             
             {isIncoming ? (
@@ -334,6 +367,19 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                     />
                 </div>
             ) : (
+                <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Belegdatum</label>
+                    <input 
+                        type="date" 
+                        required
+                        value={date} 
+                        onChange={(e) => setDate(e.target.value)} 
+                        className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
+                    />
+                </div>
+            )}
+
+            {isIncoming && (
                 <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Belegdatum</label>
                     <input 

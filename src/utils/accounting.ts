@@ -1,4 +1,5 @@
-import { Transaction, Account, AccountType, Invoice } from '../types';
+
+import { Transaction, Account, AccountType, Invoice, TransactionType } from '../types';
 
 export const calculateAccountBalance = (
   accountId: string,
@@ -53,7 +54,12 @@ export interface LedgerStats {
     endingBalance: number;
 }
 
+// Logic to identify if a transaction should count towards the "Opening Balance" column
 const isOpeningTransaction = (t: Transaction): boolean => {
+    // Explicit Type Check (Best)
+    if (t.type === TransactionType.OPENING_BALANCE) return true;
+
+    // Fallback: Legacy Text Check
     const ref = t.reference?.toUpperCase() || '';
     const desc = t.description.toLowerCase();
     return ref.startsWith('EB') || 
@@ -171,9 +177,12 @@ export const getAccountLedgerStats = (
 
             const debit = line.debit;
             const credit = line.credit;
+            
+            // Should this account type carry forward? (Balance Sheet vs P&L)
+            // Note: If user explicitly books an EB for an Expense account (unusual but possible), we show it.
             const shouldCarryForward = [AccountType.ASSET, AccountType.LIABILITY, AccountType.EQUITY].includes(accountType);
 
-            if ((isPreviousYear && shouldCarryForward) || (isCurrentYear && isEB && shouldCarryForward)) {
+            if ((isPreviousYear && shouldCarryForward) || (isCurrentYear && isEB)) {
                  if ([AccountType.ASSET, AccountType.EXPENSE].includes(accountType)) {
                      stats.openingBalance += (debit - credit);
                  } else {
