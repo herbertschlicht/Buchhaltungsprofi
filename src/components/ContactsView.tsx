@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Contact, Transaction, Account, ContactType, Invoice, PurchaseOrder, PurchaseOrderStatus, CompanySettings, Asset, CostCenter, Project } from '../types';
 import { getContactBalance, getInvoicePaymentStatus, getContactLedgerStats } from '../utils/accounting';
@@ -32,7 +31,6 @@ interface ContactsViewProps {
   accounts: Account[];
   invoices?: Invoice[];
   purchaseOrders?: PurchaseOrder[];
-  // KLR Data needed for InvoiceForm
   costCenters?: CostCenter[];
   projects?: Project[];
   companySettings: CompanySettings;
@@ -194,7 +192,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
     window.print();
   };
 
-  const fmt = (n: number) => n === 0 ? '-' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (n: number) => n === 0 ? '-' : n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="space-y-6 h-full flex flex-col">
@@ -246,7 +244,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                       <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
                           <p className="text-slate-500 text-sm font-medium uppercase">{viewMode === 'debtors' ? 'Offene Forderungen' : 'Offene Verbindlichkeiten'}</p>
-                          <p className="text-3xl font-bold text-slate-800 mt-2">{calculateTotalDue().toFixed(2)} €</p>
+                          <p className="text-3xl font-bold text-slate-800 mt-2">{calculateTotalDue().toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</p>
                       </div>
                       
                       {viewMode === 'debtors' && (
@@ -321,7 +319,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                                           </div>
                                       </div>
                                       <div className={`font-mono font-bold text-sm ${viewMode === 'debtors' ? 'text-blue-600' : 'text-orange-600'}`}>
-                                          {c.endingBalance.toLocaleString(undefined, {minimumFractionDigits: 2})} €
+                                          {c.endingBalance.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €
                                       </div>
                                   </div>
                               ))}
@@ -404,7 +402,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                                                }
                                            </td>
                                            <td className="p-4 text-sm text-right font-mono font-bold text-slate-800 print:p-2">
-                                               {item.remainingAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} €
+                                               {item.remainingAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                                            </td>
                                        </tr>
                                    );
@@ -421,112 +419,10 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                                <tr>
                                    <td colSpan={viewMode === 'creditors' ? 7 : 6} className="px-4 py-3 uppercase tracking-wider text-right print:px-2">Gesamtsumme Offen</td>
                                    <td className="px-4 py-3 text-right font-mono text-base print:px-2">
-                                      {totalOposAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} €
+                                      {totalOposAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                                    </td>
                                </tr>
                            </tfoot>
-                       </table>
-                  </div>
-              </div>
-          )}
-
-          {activeTab === 'procurement' && viewMode === 'creditors' && (
-               <div className="flex flex-col h-full">
-                   <div className="p-4 border-b border-slate-100 bg-orange-50/30 flex justify-between items-center">
-                       <div>
-                           <h3 className="font-bold text-orange-900 flex items-center">
-                               <ShoppingCart className="w-5 h-5 mr-2 text-orange-600"/>
-                               Laufende Bestellvorgänge
-                           </h3>
-                           <p className="text-xs text-slate-500">Vom Angebot bis zur Rechnungsprüfung</p>
-                       </div>
-                       <button 
-                            onClick={() => openOrderForm()}
-                            className="text-sm bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center shadow-sm"
-                        >
-                            <PlusCircle className="w-4 h-4 mr-2"/> Neuer Vorgang
-                       </button>
-                   </div>
-                   <div className="overflow-auto flex-1">
-                       <table className="w-full text-left">
-                           <thead className="bg-slate-100 text-xs text-slate-500 uppercase font-semibold">
-                               <tr>
-                                   <th className="p-4">Datum</th>
-                                   <th className="p-4">Bestell-Nr.</th>
-                                   <th className="p-4">Lieferant</th>
-                                   <th className="p-4">Beschreibung</th>
-                                   <th className="p-4">Status</th>
-                                   <th className="p-4 text-right">Netto (Plan)</th>
-                                   <th className="p-4 text-right">Aktion</th>
-                               </tr>
-                           </thead>
-                           <tbody className="divide-y divide-slate-100 bg-white">
-                               {procurementList.map(po => {
-                                   const vendor = contacts.find(c => c.id === po.contactId);
-                                   return (
-                                       <tr key={po.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => openOrderForm(po)}>
-                                           <td className="p-4 text-sm text-slate-600">{po.date}</td>
-                                           <td className="p-4 text-sm font-mono font-medium">{po.orderNumber}</td>
-                                           <td className="p-4 text-sm font-bold text-slate-800">{vendor?.name}</td>
-                                           <td className="p-4 text-sm text-slate-600 truncate max-w-xs">{po.description}</td>
-                                           <td className="p-4">{po.status}</td>
-                                           <td className="p-4 text-sm text-right font-mono">{po.netAmount.toFixed(2)} €</td>
-                                           <td className="p-4 text-right">
-                                               <button className="text-slate-400 hover:text-blue-600">
-                                                   <Eye className="w-4 h-4"/>
-                                               </button>
-                                           </td>
-                                       </tr>
-                                   );
-                               })}
-                           </tbody>
-                       </table>
-                   </div>
-               </div>
-          )}
-
-          {activeTab === 'list' && (
-              <div className="flex flex-col h-full">
-                  <div className="p-4 border-b border-slate-100 flex gap-4 bg-slate-50/50">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                            <input 
-                                type="text" 
-                                placeholder="Suche nach Namen, Ort, ID..." 
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white shadow-sm"
-                            />
-                        </div>
-                        <button 
-                              onClick={() => setShowContactForm(true)}
-                              className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-all shadow-sm flex items-center"
-                          >
-                              <PlusCircle className="w-4 h-4 mr-2"/> Kontakt
-                          </button>
-                  </div>
-                  <div className="overflow-auto flex-1">
-                       <table className="w-full text-left">
-                           <thead className="bg-slate-100 text-xs text-slate-500 uppercase font-semibold">
-                               <tr>
-                                   <th className="p-4 w-32">Nr.</th>
-                                   <th className="p-4">Name</th>
-                                   <th className="p-4">Ansprechpartner</th>
-                                   <th className="p-4">Kontakt</th>
-                                   <th className="p-4">Ort</th>
-                               </tr>
-                           </thead>
-                           <tbody className="divide-y divide-slate-100 bg-white">
-                               {masterDataList.map(contact => (
-                                   <tr key={contact.id} className="hover:bg-slate-50">
-                                       <td className="p-4 text-sm font-mono text-slate-500">{contact.id}</td>
-                                       <td className="p-4 text-sm font-bold text-slate-800">{contact.name}</td>
-                                       <td className="p-4 text-sm text-slate-600">{contact.contactPersons?.[0]?.name || '-'}</td>
-                                       <td className="p-4 text-sm text-slate-600">{contact.email || contact.phone || '-'}</td>
-                                       <td className="p-4 text-sm text-slate-600">{contact.city || '-'}</td>
-                                   </tr>
-                               ))}
-                           </tbody>
                        </table>
                   </div>
               </div>
@@ -604,7 +500,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                                        <td className="px-2 py-2 text-xs text-right font-mono text-slate-600 print:p-2">{fmt(c.debitYTD)}</td>
                                        <td className="px-2 py-2 text-xs text-right font-mono text-slate-600 print:p-2">{fmt(c.creditYTD)}</td>
                                        <td className={`px-4 py-2 text-xs text-right font-mono font-bold print:p-2 ${c.endingBalance !== 0 ? (viewMode === 'debtors' ? 'text-blue-700' : 'text-orange-700') : 'text-slate-400'}`}>
-                                           {c.endingBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} €
+                                           {c.endingBalance.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                                        </td>
                                    </tr>
                                ))}
@@ -644,7 +540,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                                        {viewMode === 'creditors' && <td className="p-4 text-sm font-mono text-slate-500">{inv.externalNumber || '-'}</td>}
                                        <td className="p-4 text-sm text-slate-600 truncate max-w-xs">{inv.description}</td>
                                        <td className="p-4 text-sm text-slate-600">{new Date(inv.dueDate).toLocaleDateString('de-DE')}</td>
-                                       <td className="p-4 text-sm text-right font-mono font-medium">{inv.grossAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} €</td>
+                                       <td className="p-4 text-sm text-right font-mono font-medium">{inv.grossAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</td>
                                    </tr>
                                ))}
                            </tbody>
@@ -679,7 +575,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                                        <td className="p-4 text-sm font-bold text-red-600">{item.daysOverdue} Tage</td>
                                        <td className="p-4 text-sm font-mono">{item.number}</td>
                                        <td className="p-4 text-sm font-bold text-slate-800">{item.contactName}</td>
-                                       <td className="p-4 text-sm text-right font-mono">{item.remainingAmount.toFixed(2)} €</td>
+                                       <td className="p-4 text-sm text-right font-mono">{item.remainingAmount.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</td>
                                        <td className="p-4 text-center">
                                            <span className="px-2 py-1 rounded text-xs font-bold bg-yellow-500 text-white">Stufe {item.dunningLevel || 0}</span>
                                        </td>

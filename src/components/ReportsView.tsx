@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Transaction, Account, AccountType, CompanySettings } from '../types';
 import { Calculator, AlertCircle, CheckCircle, Printer, Building2, FileText, PieChart, Search, ChevronDown, ChevronRight, Calendar, AlertTriangle } from 'lucide-react';
@@ -78,6 +79,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
 
   // --- ENGINE: Map Accounts to Categories based on SKR03 Code Ranges ---
   const mapAccountToCategory = (account: Account): string => {
+      // FIX: Parse only first 4 digits to handle 7-digit DATEV codes (e.g. 1400000 -> 1400)
       const c = parseInt(account.code.substring(0, 4));
       
       // --- GuV (P&L) Mapping ---
@@ -255,17 +257,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
   }> = ({ label, amount, prevAmount, isTotal, level = 0, details }) => {
       const [expanded, setExpanded] = useState(true);
       
-      // Visual Hierarchy Logic based on Level
       const isRoot = level === 0 && isTotal;
       const isGroup = level === 1;
       
       const textColor = amount < 0 ? 'text-red-700' : 'text-slate-900';
       const prevTextColor = prevAmount < 0 ? 'text-red-400' : 'text-slate-500';
 
-      // Indentation logic
       const indentClass = level === 0 ? 'pl-2' : level === 1 ? 'pl-6' : 'pl-10';
       
-      // Styling logic
       let containerClass = "grid grid-cols-12 items-center py-1 pr-2 transition-colors border-b border-transparent hover:bg-slate-50";
       let labelClass = "col-span-6 flex items-center gap-2 truncate";
       let numberClass = "col-span-3 text-right font-mono text-sm";
@@ -297,14 +296,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                       <span>{label}</span>
                   </div>
                   
-                  {/* Current Year Column */}
+                  {/* Current Year Column - STRICT DE-DE 2 DECIMALS */}
                   <div className={`${numberClass} ${textColor}`}>
-                      {amount.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                      {amount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                   </div>
 
                   {/* Previous Year Column */}
                   <div className={`col-span-3 text-right font-mono text-xs ${prevTextColor}`}>
-                      {prevAmount !== 0 ? prevAmount.toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' €' : '-'}
+                      {prevAmount !== 0 ? prevAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €' : '-'}
                   </div>
               </div>
               {expanded && details && (
@@ -320,7 +319,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
       const relevantAccounts = accounts.filter(a => mapAccountToCategory(a) === categoryId && a.type === type);
       if (relevantAccounts.length === 0) return null;
 
-      // Need to calculate account balance individually for current year for the details view
       const getAccBal = (accId: string) => {
           const startDate = `${selectedYear}-01-01`;
           const endDate = `${selectedYear}-12-31`;
@@ -349,7 +347,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                               <span className="font-mono text-slate-400">{acc.code}</span>
                               <span>{acc.name}</span>
                           </div>
-                          <div className="col-span-3 text-right font-mono">{bal.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</div>
+                          <div className="col-span-3 text-right font-mono">{bal.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</div>
                           <div className="col-span-3"></div>
                       </div>
                   );
@@ -385,7 +383,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
           if (t.date.substring(0, 4) !== selectedYear.toString()) return;
           const taxLine = t.lines.find(l => l.accountId === taxAccount.id);
           if (!taxLine) return;
-          const baseLine = t.lines.find(l => l.accountId !== taxAccount.id && !['1000000', '1200000', '1400000', '1600000', '1210000'].some(code => accounts.find(a => a.id === l.accountId)?.code.startsWith(code)));
+          // Simple heuristic to find base amount line
+          const baseLine = t.lines.find(l => l.accountId !== taxAccount.id && l.debit + l.credit > 0.01);
           if (baseLine) {
               const acc = accounts.find(a => a.id === baseLine.accountId);
               if (acc) {
@@ -408,7 +407,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
           <div className="w-10 border-l border-r border-slate-300 bg-slate-200 p-1.5 text-center font-bold text-slate-900">{kz || ''}</div>
           <div className="w-32 p-1.5 text-right font-mono bg-white">
               {value !== undefined ? (isTaxField ? 
-                  <span className={value < 0 ? 'text-red-600' : 'text-slate-900'}>{value.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</span> : 
+                  <span className={value < 0 ? 'text-red-600' : 'text-slate-900'}>{value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> : 
                   <span className="text-slate-900">{Math.floor(value).toLocaleString('de-DE')}</span>
               ) : <div className="w-full h-full bg-slate-100/30 diagonal-stripe"></div>}
           </div>
@@ -430,7 +429,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
 
   const LedgerFiller = () => (
       <div className="flex-1 w-full relative border-x border-slate-200 min-h-[50px] bg-slate-50/10">
-         {/* Visual filler for empty space in T-Account */}
          <div className="absolute inset-0" style={{backgroundImage: `linear-gradient(to bottom right, transparent calc(50% - 1px), #f1f5f9 calc(50%), transparent calc(50% + 1px))`}}></div>
       </div>
   );
@@ -523,10 +521,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                   <div className="grid grid-cols-12 items-center text-lg font-bold">
                       <div className="col-span-6 pl-4 uppercase">Jahresüberschuss / Fehlbetrag</div>
                       <div className={`col-span-3 text-right ${currentData.netResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {currentData.netResult.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                          {currentData.netResult.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                       </div>
                       <div className={`col-span-3 text-right text-sm ${previousData.netResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {previousData.netResult.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                          {previousData.netResult.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                       </div>
                   </div>
               </div>
@@ -574,10 +572,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                   <div className="grid grid-cols-12 py-2 px-2 border-t-4 border-double border-black bg-white mt-auto items-baseline">
                       <div className="col-span-6"></div>
                       <div className="col-span-3 text-right font-bold text-slate-900">
-                        {currentData.sumAktiva.toLocaleString('de-DE', {minimumFractionDigits: 2})} €
+                        {currentData.sumAktiva.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €
                       </div>
                       <div className="col-span-3 text-right font-bold text-slate-500 text-xs">
-                        {previousData.sumAktiva.toLocaleString('de-DE', {minimumFractionDigits: 2})} €
+                        {previousData.sumAktiva.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €
                       </div>
                   </div>
               </div>
@@ -622,10 +620,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                    <div className="grid grid-cols-12 py-2 px-2 border-t-4 border-double border-black bg-white mt-auto items-baseline">
                       <div className="col-span-6"></div>
                       <div className="col-span-3 text-right font-bold text-slate-900">
-                        {currentData.sumPassiva.toLocaleString('de-DE', {minimumFractionDigits: 2})} €
+                        {currentData.sumPassiva.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €
                       </div>
                       <div className="col-span-3 text-right font-bold text-slate-500 text-xs">
-                        {previousData.sumPassiva.toLocaleString('de-DE', {minimumFractionDigits: 2})} €
+                        {previousData.sumPassiva.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €
                       </div>
                   </div>
               </div>
@@ -679,8 +677,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                                     {getReconciliationData(conf.code, conf.rate).map((row, i) => (
                                         <tr key={i} className="hover:bg-slate-50 border-b border-slate-100">
                                             <td className="p-3">{row.accountName}</td>
-                                            <td className="p-3 text-right font-mono">{row.netAmount.toFixed(2)}</td>
-                                            <td className="p-3 text-right font-bold">{row.taxAmount.toFixed(2)}</td>
+                                            <td className="p-3 text-right font-mono">{row.netAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                            <td className="p-3 text-right font-bold">{row.taxAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                         </tr>
                                     ))}
                                 </tbody>

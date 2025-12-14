@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Transaction, Account, AccountType } from '../types';
 import { generateFinancialInsight } from '../services/geminiService';
@@ -48,9 +49,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, accounts }) 
 
   const handleGenerateInsight = async () => {
     setLoadingInsight(true);
-    const result = await generateFinancialInsight(transactions, accounts);
-    setInsight(result);
-    setLoadingInsight(false);
+    try {
+        const result = await generateFinancialInsight(transactions, accounts);
+        setInsight(result);
+    } catch (e) {
+        setInsight("Fehler bei der Analyse. Bitte prüfen Sie Ihre Verbindung oder den API-Key.");
+    } finally {
+        setLoadingInsight(false);
+    }
   };
 
   return (
@@ -88,7 +94,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, accounts }) 
             </div>
             <p className="text-slate-400 text-sm font-semibold uppercase tracking-wider">Nettoergebnis</p>
             <h3 className={`text-3xl font-bold mt-1 ${netIncome >= 0 ? 'text-slate-800' : 'text-red-600'}`}>
-                {netIncome.toLocaleString()} €
+                {netIncome.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €
             </h3>
         </div>
 
@@ -99,7 +105,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, accounts }) 
                 </div>
             </div>
             <p className="text-slate-400 text-sm font-semibold uppercase tracking-wider">Einnahmen</p>
-            <h3 className="text-3xl font-bold text-slate-800 mt-1">{revenue.toLocaleString()} €</h3>
+            <h3 className="text-3xl font-bold text-slate-800 mt-1">{revenue.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</h3>
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-[0_2px_20px_rgb(0,0,0,0.04)] border border-slate-50 hover:border-slate-200 transition-colors">
@@ -109,7 +115,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, accounts }) 
                 </div>
             </div>
             <p className="text-slate-400 text-sm font-semibold uppercase tracking-wider">Ausgaben</p>
-            <h3 className="text-3xl font-bold text-slate-800 mt-1">{expenses.toLocaleString()} €</h3>
+            <h3 className="text-3xl font-bold text-slate-800 mt-1">{expenses.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</h3>
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-[0_2px_20px_rgb(0,0,0,0.04)] border border-slate-50 hover:border-slate-200 transition-colors">
@@ -119,7 +125,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, accounts }) 
                 </div>
             </div>
             <p className="text-slate-400 text-sm font-semibold uppercase tracking-wider">Liquidität</p>
-            <h3 className="text-3xl font-bold text-slate-800 mt-1">{cashBalance.toLocaleString()} €</h3>
+            <h3 className="text-3xl font-bold text-slate-800 mt-1">{cashBalance.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</h3>
         </div>
       </div>
 
@@ -141,6 +147,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, accounts }) 
                     <Tooltip 
                         contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }} 
                         cursor={{stroke: '#cbd5e1', strokeWidth: 1}}
+                        formatter={(value: number) => [`${value.toLocaleString('de-DE', {minimumFractionDigits: 2})} €`, 'Betrag']}
                     />
                     <Area type="monotone" dataKey="amount" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#colorAmount)" />
                 </AreaChart>
@@ -157,6 +164,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, accounts }) 
                     <Tooltip 
                         cursor={{fill: '#f8fafc'}} 
                         contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }} 
+                        formatter={(value: number) => [`${value.toLocaleString('de-DE', {minimumFractionDigits: 2})} €`]}
                     />
                     <Legend iconType="circle" wrapperStyle={{paddingTop: '20px'}} />
                     <Bar dataKey="Revenue" fill="#3b82f6" radius={[6, 6, 6, 6]} barSize={50} name="Einnahmen" />
