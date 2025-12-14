@@ -210,8 +210,8 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({
                                     onChange={(e) => setOrderNumber(e.target.value)}
                                     className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none font-mono bg-slate-50"
                                  />
-                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
-                                     <RefreshCw className="w-3 h-3" title="Passt sich dem Jahr an" />
+                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" title="Passt sich dem Jahr an">
+                                     <RefreshCw className="w-3 h-3" />
                                  </div>
                              </div>
                         </div>

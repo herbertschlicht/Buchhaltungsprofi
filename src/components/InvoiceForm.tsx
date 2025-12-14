@@ -43,15 +43,15 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     type, 
     contacts, 
     accounts, 
-    costCenters = [],
-    projects = [],
-    transactions = [],
-    purchaseOrders = [],
+    costCenters = [], 
+    projects = [], 
+    transactions = [], 
+    purchaseOrders = [], 
     invoices = [], 
     nextInvoiceNumber, 
     nextAssetNumber, 
     onSave, 
-    onSwitchToOrder,
+    onSwitchToOrder, 
     onClose 
 }) => {
   const isIncoming = type === 'incoming';
@@ -348,8 +348,8 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                         onChange={(e) => setInvoiceNumber(e.target.value)} 
                         className={`w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium font-mono ${isIncoming ? 'bg-slate-50 text-slate-600' : ''}`}
                     />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">
-                        <RefreshCw className="w-3 h-3" title="Nummer passt sich automatisch dem Jahr an" />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400" title="Nummer passt sich automatisch dem Jahr an">
+                        <RefreshCw className="w-3 h-3" />
                     </div>
                 </div>
             </div>
