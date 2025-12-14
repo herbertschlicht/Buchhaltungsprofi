@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Transaction, Account, AccountType } from '../types';
 import { generateFinancialInsight } from '../services/geminiService';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
-import { Sparkles, TrendingUp, TrendingDown, DollarSign, Wallet } from 'lucide-react';
+import { Sparkles, TrendingUp, TrendingDown, DollarSign, Wallet, AlertTriangle } from 'lucide-react';
 
 interface DashboardProps {
   transactions: Transaction[];
@@ -49,12 +49,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, accounts }) 
 
   const handleGenerateInsight = async () => {
     setLoadingInsight(true);
+    setInsight(""); // Reset old insight
     try {
         const result = await generateFinancialInsight(transactions, accounts);
         setInsight(result);
-    } catch (e) {
-        setInsight("Fehler bei der Analyse. Bitte prüfen Sie Ihre Verbindung oder den API-Key.");
+    } catch (error) {
+        console.error("Analysis failed", error);
+        setInsight("Die Analyse konnte momentan nicht durchgeführt werden. Bitte überprüfen Sie Ihre Internetverbindung oder den API-Schlüssel.");
     } finally {
+        // CRITICAL: Ensure loading state is reset even on error to stop the spinner
         setLoadingInsight(false);
     }
   };
@@ -69,17 +72,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, accounts }) 
         <button 
             onClick={handleGenerateInsight}
             disabled={loadingInsight}
-            className="mt-4 md:mt-0 flex items-center bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all font-medium"
+            className={`mt-4 md:mt-0 flex items-center px-6 py-3 rounded-full shadow-lg hover:shadow-xl transition-all font-medium text-white ${loadingInsight ? 'bg-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:-translate-y-0.5'}`}
         >
-            <Sparkles className={`w-5 h-5 mr-2 ${loadingInsight ? 'animate-spin' : ''}`} />
-            {loadingInsight ? 'Analysiere Daten...' : 'KI-Analyse starten'}
+            {loadingInsight ? (
+                <>
+                    <div className="w-5 h-5 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Analysiere...
+                </>
+            ) : (
+                <>
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    KI-Analyse starten
+                </>
+            )}
         </button>
       </div>
 
       {insight && (
         <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 p-6 rounded-3xl text-indigo-900 animate-fadeIn shadow-inner">
             <h3 className="font-bold flex items-center mb-3 text-lg"><Sparkles className="w-5 h-5 mr-2 text-purple-600"/> KI-Analyse Ergebnis</h3>
-            <p className="text-base leading-relaxed text-slate-700">{insight}</p>
+            <p className="text-base leading-relaxed text-slate-700 whitespace-pre-wrap">{insight}</p>
         </div>
       )}
 

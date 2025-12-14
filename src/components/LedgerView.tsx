@@ -94,11 +94,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
       return hasMovement;
   }) : [];
 
-  // CORRECTION: Calculate Totals correctly by respecting Debit vs Credit accounts
   const totalListStats = balancesList.reduce((acc, c) => {
-    // Determine if account is naturally Credit-side (Passive/Revenue)
-    // The individual row value 'c.endingBalance' is always positive for its natural side.
-    // To sum them up to a Net Total (Debit - Credit), we subtract Credit accounts.
     const isCreditSide = [AccountType.LIABILITY, AccountType.EQUITY, AccountType.REVENUE].includes(c.type);
     
     const effectiveOpening = isCreditSide ? -c.openingBalance : c.openingBalance;
@@ -213,8 +209,9 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
   const handleCreateAccount = () => {
       if (!newAccountCode || !newAccountName) return;
       
-      if (!/^\d{7}$/.test(newAccountCode)) {
-          alert("Die Kontonummer muss exakt 7-stellig sein (SKR03 Standard).");
+      // Allow 4 to 7 digits
+      if (!/^\d{4,7}$/.test(newAccountCode)) {
+          alert("Die Kontonummer muss zwischen 4 und 7 Ziffern lang sein.");
           return;
       }
 
@@ -241,7 +238,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
       window.print();
   };
 
-  const fmt = (n: number) => n === 0 ? '-' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (n: number) => n === 0 ? '-' : n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="space-y-6 h-full flex flex-col">
@@ -367,27 +364,22 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
                                 type="text" 
                                 autoFocus
                                 maxLength={7}
-                                minLength={7}
                                 value={newAccountCode}
                                 onChange={e => setNewAccountCode(e.target.value.replace(/[^0-9]/g, ''))}
-                                placeholder="z.B. 1530001"
+                                placeholder="z.B. 9000 oder 1530001"
                                 className={`w-full p-2.5 border rounded-lg outline-none font-mono ${
-                                    newAccountCode.length > 0 && newAccountCode.length !== 7 
-                                    ? 'border-red-300 focus:ring-2 focus:ring-red-200' 
-                                    : newAccountCode.length === 7 
+                                    (newAccountCode.length >= 4 && newAccountCode.length <= 7)
                                         ? 'border-green-300 focus:ring-2 focus:ring-green-200' 
                                         : 'border-slate-300 focus:ring-2 focus:ring-blue-500'
                                 }`}
                               />
                               <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono ${
-                                  newAccountCode.length === 7 ? 'text-green-600 font-bold' : 'text-slate-400'
+                                  (newAccountCode.length >= 4 && newAccountCode.length <= 7) ? 'text-green-600 font-bold' : 'text-slate-400'
                               }`}>
-                                  {newAccountCode.length}/7
+                                  {newAccountCode.length}
                               </div>
                           </div>
-                          {newAccountCode.length > 0 && newAccountCode.length !== 7 && (
-                              <p className="text-[10px] text-red-500 mt-1 font-medium">Die Nummer muss exakt 7 Ziffern haben.</p>
-                          )}
+                          <p className="text-[10px] text-slate-400 mt-1">Erlaubt: 4 bis 7 Ziffern (Standard: SKR03/04).</p>
                       </div>
                       <div>
                           <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bezeichnung</label>
@@ -395,7 +387,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
                             type="text" 
                             value={newAccountName}
                             onChange={e => setNewAccountName(e.target.value)}
-                            placeholder="z.B. Ford. Reisekosten Müller"
+                            placeholder="z.B. Saldenvorträge Sachkonten"
                             className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold"
                           />
                       </div>
@@ -408,7 +400,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
                             >
                                 <option value={AccountType.ASSET}>Aktiva (Bestand / Forderung)</option>
                                 <option value={AccountType.LIABILITY}>Passiva (Bestand / Verbindlichkeit)</option>
-                                <option value={AccountType.EQUITY}>Eigenkapital</option>
+                                <option value={AccountType.EQUITY}>Eigenkapital (Vortrag)</option>
                                 <option value={AccountType.REVENUE}>Erlös (Ertrag)</option>
                                 <option value={AccountType.EXPENSE}>Aufwand (Kosten)</option>
                             </select>
@@ -419,7 +411,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
                       <button onClick={() => setIsCreating(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">Abbrechen</button>
                       <button 
                         onClick={handleCreateAccount}
-                        disabled={!newAccountCode || !newAccountName || newAccountCode.length !== 7}
+                        disabled={!newAccountCode || !newAccountName || newAccountCode.length < 4}
                         className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                           Anlegen
@@ -474,10 +466,10 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
                                     {account?.name}
                                 </td>
                                 <td className="p-4 text-sm text-right font-mono">
-                                    {line.debit !== 0 ? `${line.debit.toLocaleString(undefined, {minimumFractionDigits: 2})} €` : '-'}
+                                    {line.debit !== 0 ? `${line.debit.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €` : '-'}
                                 </td>
                                 <td className="p-4 text-sm text-right font-mono">
-                                    {line.credit !== 0 ? `${line.credit.toLocaleString(undefined, {minimumFractionDigits: 2})} €` : '-'}
+                                    {line.credit !== 0 ? `${line.credit.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €` : '-'}
                                 </td>
                                 </tr>
                             );
@@ -668,8 +660,9 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
                                         {fmt(acc.creditYTD)}
                                     </td>
 
+                                    {/* FORCE DE-DE FOR ENDSALDO */}
                                     <td className={`px-4 py-2 text-xs text-right font-mono font-bold border-l border-slate-200 bg-slate-50 print:px-1 print:py-1 ${acc.endingBalance < 0 ? 'text-red-600' : 'text-slate-800'}`}>
-                                        {acc.endingBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} €
+                                        {acc.endingBalance.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                                     </td>
                                 </tr>
                                 )
@@ -687,7 +680,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
                                 <td className="px-2 py-3 text-right font-mono print:px-1 print:py-1">{fmt(totalListStats.debitYTD)}</td>
                                 <td className="px-2 py-3 text-right font-mono print:px-1 print:py-1">{fmt(totalListStats.creditYTD)}</td>
                                 <td className="px-4 py-3 text-right font-mono text-sm print:px-1 print:py-1">
-                                   {totalListStats.endingBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} €
+                                   {totalListStats.endingBalance.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                                 </td>
                             </tr>
                         </tfoot>
@@ -732,7 +725,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
                         <div className="text-right">
                             <p className="text-xs text-slate-500 uppercase font-semibold">Endsaldo per {reportDateFormatted}</p>
                             <p className="text-2xl font-bold text-slate-900">
-                                {accountSheetData.finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} €
+                                {accountSheetData.finalBalance.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                             </p>
                         </div>
                     </div>
@@ -774,7 +767,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, 
                                   <td className="p-4 text-sm text-right font-mono text-slate-600">{fmt(row.debit)}</td>
                                   <td className="p-4 text-sm text-right font-mono text-slate-600">{fmt(row.credit)}</td>
                                   <td className={`p-4 text-sm text-right font-mono font-bold border-l border-slate-200 ${row.balance < 0 ? 'text-red-600' : 'text-slate-800'}`}>
-                                      {row.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} €
+                                      {row.balance.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                                   </td>
                               </tr>
                           ))}

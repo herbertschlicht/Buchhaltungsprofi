@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Contact, Transaction, Account, ContactType, Invoice, PurchaseOrder, PurchaseOrderStatus, CompanySettings, Asset, CostCenter, Project } from '../types';
 import { getContactBalance, getInvoicePaymentStatus, getContactLedgerStats } from '../utils/accounting';
