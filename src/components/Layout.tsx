@@ -1,7 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  LayoutDashboard, 
   BookOpen, 
   Users, 
   FileText, 
@@ -15,7 +14,6 @@ import {
   ArrowLeftRight,
   UserCheck,
   Building,
-  ChevronDown,
   LogOut,
   Plus,
   ChevronsUpDown,

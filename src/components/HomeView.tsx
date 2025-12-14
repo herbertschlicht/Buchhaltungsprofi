@@ -8,7 +8,6 @@ import {
     LayoutDashboard, 
     ArrowRight,
     Briefcase,
-    Building2,
     Smile,
     HelpCircle,
     ChevronDown,
@@ -20,7 +19,6 @@ import {
     Bot,
     Code,
     Cloud,
-    ExternalLink,
     Key
 } from 'lucide-react';
 
