@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Account, Contact, ContactType, Transaction, Invoice, AccountType, Asset, CostCenter, Project } from '../types';
-import { X, Save, Calculator, ArrowDownCircle, ArrowUpCircle, RefreshCw, Calendar, FileUp, Loader2, CheckCircle2, Sparkles, UserPlus, AlertCircle } from 'lucide-react';
+import { X, Save, Calculator, ArrowDownCircle, ArrowUpCircle, RefreshCw, Calendar, FileUp, Loader2, CheckCircle2, Sparkles, UserPlus, AlertCircle, Building2, Target } from 'lucide-react';
 import { extractInvoiceData } from '../services/geminiService';
 import { ContactForm } from './ContactForm';
 
@@ -10,6 +10,9 @@ interface InvoiceFormProps {
   contacts: Contact[];
   accounts: Account[];
   invoices?: Invoice[];
+  costCenters?: CostCenter[];
+  projects?: Project[];
+  transactions?: Transaction[];
   nextInvoiceNumber: string; 
   onSave: (invoice: Invoice, transaction: Transaction, newAsset?: Asset) => void;
   onAddContact: (contact: Contact) => void; 
@@ -29,7 +32,7 @@ const INCOMING_TAX_CONFIG = [
 ];
 
 export const InvoiceForm: React.FC<InvoiceFormProps> = ({ 
-    type, contacts, accounts, invoices = [], onSave, onAddContact, onClose 
+    type, contacts, accounts, invoices = [], costCenters = [], projects = [], onSave, onAddContact, onClose 
 }) => {
   const isIncoming = type === 'incoming';
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +46,10 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   const [selectedTaxIndex, setSelectedTaxIndex] = useState(0); 
   const [selectedAccountId, setSelectedAccountId] = useState('');
   
+  // Controlling fields
+  const [selectedCostCenter, setSelectedCostCenter] = useState('');
+  const [selectedProject, setSelectedProject] = useState('');
+
   const [isScanning, setIsScanning] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
   const [aiContactDraft, setAiContactDraft] = useState<Partial<Contact> | null>(null);
@@ -139,14 +146,9 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   };
 
   const onQuickContactSaved = (newContact: Contact) => {
-      // Wichtig: Erst Modal schließen und Draft leeren, um UI-Sprünge zu vermeiden
       setShowContactModal(false);
       setAiContactDraft(null);
-      
-      // Dann global speichern
       onAddContact(newContact);
-      
-      // Und sofort lokal auswählen
       setContactId(newContact.id);
   };
 
@@ -170,6 +172,12 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
         id: invoiceId, number: invoiceNumber, externalNumber: isIncoming ? externalNumber : undefined, 
         date, dueDate: date, contactId, description, netAmount, taxRate: taxConfig.rate, taxAmount, grossAmount, transactionId
     };
+
+    const klr = {
+        costCenterId: selectedCostCenter || undefined,
+        projectId: selectedProject || undefined
+    };
+
     const lines = [];
     if (!isIncoming) {
         const debtorAcc = accounts.find(a => a.code === '1400000');
@@ -177,7 +185,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
         const taxAcc = taxConfig.taxAccountCode ? accounts.find(a => a.code === taxConfig.taxAccountCode) : null;
         if (debtorAcc && revAcc) {
             lines.push({ accountId: debtorAcc.id, debit: grossAmount, credit: 0 }); 
-            lines.push({ accountId: revAcc.id, debit: 0, credit: netAmount }); 
+            lines.push({ accountId: revAcc.id, debit: 0, credit: netAmount, ...klr }); 
             if (taxAcc) lines.push({ accountId: taxAcc.id, debit: 0, credit: taxAmount }); 
         }
     } else {
@@ -185,7 +193,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
         const expAcc = accounts.find(a => a.id === selectedAccountId); 
         const taxAcc = taxConfig.taxAccountCode ? accounts.find(a => a.code === taxConfig.taxAccountCode) : null;
         if (creditorAcc && expAcc) {
-            lines.push({ accountId: expAcc.id, debit: netAmount, credit: 0 }); 
+            lines.push({ accountId: expAcc.id, debit: netAmount, credit: 0, ...klr }); 
             if (taxAcc) lines.push({ accountId: taxAcc.id, debit: taxAmount, credit: 0 }); 
             lines.push({ accountId: creditorAcc.id, debit: 0, credit: grossAmount }); 
         }
@@ -208,7 +216,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 overflow-y-auto flex-1 space-y-6">
+        <form id="invoice-form" onSubmit={handleSubmit} className="p-8 overflow-y-auto flex-1 space-y-6">
           
           <div 
             onClick={() => fileInputRef.current?.click()}
@@ -289,6 +297,42 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                 <input type="text" required value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-2.5 border rounded-lg outline-none" />
           </div>
 
+          {/* CONTROLLING SECTION (NEW) */}
+          {(costCenters.length > 0 || projects.length > 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                  {costCenters.length > 0 && (
+                      <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center">
+                              <Building2 className="w-3 h-3 mr-1" /> Kostenstelle
+                          </label>
+                          <select 
+                            value={selectedCostCenter} 
+                            onChange={e => setSelectedCostCenter(e.target.value)}
+                            className="w-full p-2 border rounded-lg text-xs bg-white outline-none"
+                          >
+                              <option value="">- Ohne KSt -</option>
+                              {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.code} {cc.name}</option>)}
+                          </select>
+                      </div>
+                  )}
+                  {projects.length > 0 && (
+                      <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center">
+                              <Target className="w-3 h-3 mr-1" /> Projekt / Bauvorhaben
+                          </label>
+                          <select 
+                            value={selectedProject} 
+                            onChange={e => setSelectedProject(e.target.value)}
+                            className="w-full p-2 border rounded-lg text-xs bg-white outline-none"
+                          >
+                              <option value="">- Ohne Projekt -</option>
+                              {projects.map(p => <option key={p.id} value={p.id}>{p.code} {p.name}</option>)}
+                          </select>
+                      </div>
+                  )}
+              </div>
+          )}
+
           <div className={`p-6 rounded-xl border ${isIncoming ? 'bg-orange-50/30' : 'bg-blue-50/30'}`}>
              <div className="grid grid-cols-2 gap-6 mb-4">
                  <div>
@@ -322,7 +366,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
 
         <div className="p-6 bg-slate-50 border-t flex justify-end gap-3">
             <button type="button" onClick={onClose} className="px-4 py-2 border rounded-lg">Abbrechen</button>
-            <button type="submit" form="invoice-form" onClick={handleSubmit} className={`px-6 py-2 text-white rounded-lg font-bold shadow-lg ${isIncoming ? 'bg-orange-600' : 'bg-blue-600'}`}>
+            <button type="submit" form="invoice-form" className={`px-6 py-2 text-white rounded-lg font-bold shadow-lg ${isIncoming ? 'bg-orange-600' : 'bg-blue-600'}`}>
               Speichern
             </button>
         </div>
