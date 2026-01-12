@@ -33,7 +33,7 @@ export const generateFinancialInsight = async (
  }, 0);
 
   const prompt = `
-    Sie sind ein erfahrener Buchhalter. Analysieren Sie die folgende Zusammenfassung:
+    Sie sind ein erfahreier Buchhalter. Analysieren Sie die folgende Zusammenfassung:
     Gesamteinnahmen: ${revenue.toFixed(2)} €
     Gesamtausgaben: ${expenses.toFixed(2)} €
     Nettoergebnis: ${(revenue - expenses).toFixed(2)} €
@@ -148,9 +148,16 @@ export const generateCoachImage = async (prompt: string): Promise<string | null>
             },
         });
 
+        // Safe check for candidates and parts to satisfy TypeScript compiler
+        const candidates = response.candidates;
+        if (!candidates || candidates.length === 0) return null;
+
+        const parts = candidates[0].content?.parts;
+        if (!parts) return null;
+
         // Iterate through response parts to find the inline image data
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
+        for (const part of parts) {
+            if (part.inlineData?.data) {
                 const base64EncodeString: string = part.inlineData.data;
                 return `data:image/png;base64,${base64EncodeString}`;
             }
