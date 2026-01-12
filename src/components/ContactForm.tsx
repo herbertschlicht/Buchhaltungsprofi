@@ -2,14 +2,14 @@
 import React, { useState } from 'react';
 import { Contact, ContactType, ContactPerson, CostCenter, Project } from '../types';
 import { 
-  X, Save, User, Mail, Building, MapPin, Phone, Globe, FileText, 
-  BadgeEuro, UserCircle, CreditCard, Loader2, AlertTriangle, 
-  Plus, Trash2, ShieldAlert, Truck, Briefcase, Target, CheckCircle
+  X, Save, User, MapPin, BadgeEuro, CreditCard, Loader2, 
+  Plus, UserCircle, Briefcase, ShieldAlert, CheckCircle
 } from 'lucide-react';
 
 interface ContactFormProps {
   type: ContactType;
   nextId: string;
+  initialData?: Partial<Contact>; 
   costCenters?: CostCenter[];
   projects?: Project[];
   onSave: (contact: Contact) => void;
@@ -19,7 +19,7 @@ interface ContactFormProps {
 type TabType = 'identity' | 'address' | 'finance' | 'bank' | 'internal';
 
 export const ContactForm: React.FC<ContactFormProps> = ({ 
-    type, nextId, costCenters = [], projects = [], onSave, onClose 
+    type, nextId, initialData, costCenters = [], projects = [], onSave, onClose 
 }) => {
   const isVendor = type === ContactType.VENDOR;
   const [activeTab, setActiveTab] = useState<TabType>('identity');
@@ -27,9 +27,13 @@ export const ContactForm: React.FC<ContactFormProps> = ({
   const [formData, setFormData] = useState<Partial<Contact>>({
     id: nextId,
     type: type,
-    name: '',
-    country: 'Deutschland',
-    taxStatus: 'DOMESTIC',
+    name: initialData?.name || '',
+    street: initialData?.street || '',
+    zip: initialData?.zip || '',
+    city: initialData?.city || '',
+    vatId: initialData?.vatId || '',
+    country: initialData?.country || 'Deutschland',
+    taxStatus: initialData?.taxStatus || 'DOMESTIC',
     paymentTermsDays: 14,
     discountRate: 0,
     discountDays: 0,
@@ -70,7 +74,15 @@ export const ContactForm: React.FC<ContactFormProps> = ({
         alert("Bitte geben Sie einen Namen an.");
         return;
     }
-    onSave(formData as Contact);
+    
+    const finalContact: Contact = {
+        ...formData,
+        id: formData.id || nextId,
+        name: formData.name || '',
+        type: type,
+    } as Contact;
+
+    onSave(finalContact);
     onClose();
   };
 
@@ -90,77 +102,44 @@ export const ContactForm: React.FC<ContactFormProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 font-sans backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4 font-sans backdrop-blur-md">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] animate-fadeIn">
         
         <div className={`p-5 border-b flex justify-between items-center ${isVendor ? 'bg-orange-50' : 'bg-blue-50'}`}>
           <div>
             <h2 className="text-xl font-bold text-slate-800 flex items-center">
                {isVendor ? <Briefcase className="w-6 h-6 mr-2 text-orange-600"/> : <UserCircle className="w-6 h-6 mr-2 text-blue-600"/>}
-               {isVendor ? 'Kreditoren-Stammdaten pflegen' : 'Debitoren-Stammdaten pflegen'}
+               {isVendor ? 'Neuen Kreditor anlegen' : 'Neuen Debitor anlegen'}
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Ident-Nr: <span className="font-mono font-bold text-slate-700">{formData.id}</span></p>
+            <p className="text-xs text-slate-500 mt-0.5">ID: <span className="font-mono font-bold text-slate-700">{formData.id}</span></p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-white rounded-full transition-all"><X className="w-6 h-6" /></button>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-white rounded-full transition-all"><X className="w-6 h-6" /></button>
         </div>
 
         <div className="flex border-b border-slate-100 bg-slate-50/50 overflow-x-auto no-scrollbar">
-          <TabButton id="identity" label="Identität & Kontakt" icon={User} />
-          <TabButton id="address" label="Adresse & Lieferung" icon={MapPin} />
-          <TabButton id="finance" label="Finanzen & Steuer" icon={BadgeEuro} />
-          <TabButton id="bank" label="Bank & SEPA" icon={CreditCard} />
-          <TabButton id="internal" label="Intern & Mahnwesen" icon={ShieldAlert} />
+          <TabButton id="identity" label="Identität" icon={User} />
+          <TabButton id="address" label="Adresse" icon={MapPin} />
+          <TabButton id="finance" label="Steuer" icon={BadgeEuro} />
+          <TabButton id="bank" label="Bank" icon={CreditCard} />
+          <TabButton id="internal" label="Notizen" icon={ShieldAlert} />
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8">
-          
+        <form id="contact-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8">
           {activeTab === 'identity' && (
             <div className="space-y-6 animate-fadeIn">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{isVendor ? 'Firmenname / Lieferant *' : 'Kundenname / Firma *'}</label>
-                    <input type="text" required value={formData.name} onChange={e => updateField('name', e.target.value)} className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-lg" placeholder="z.B. Musterbau GmbH"/>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Name / Firma *</label>
+                    <input type="text" required value={formData.name} onChange={e => updateField('name', e.target.value)} className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-lg" placeholder="Name"/>
                 </div>
                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-Mail (Zentral)</label>
-                    <input type="email" value={formData.email} onChange={e => updateField('email', e.target.value)} className="w-full p-2.5 border rounded-lg" placeholder="info@firma.de"/>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-Mail</label>
+                    <input type="email" value={formData.email || ''} onChange={e => updateField('email', e.target.value)} className="w-full p-2.5 border rounded-lg" placeholder="info@..."/>
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Telefon</label>
-                    <input type="tel" value={formData.phone} onChange={e => updateField('phone', e.target.value)} className="w-full p-2.5 border rounded-lg" placeholder="+49..."/>
+                    <input type="tel" value={formData.phone || ''} onChange={e => updateField('phone', e.target.value)} className="w-full p-2.5 border rounded-lg" placeholder="+49..."/>
                 </div>
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fax</label>
-                    <input type="tel" value={formData.fax} onChange={e => updateField('fax', e.target.value)} className="w-full p-2.5 border rounded-lg"/>
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Webseite</label>
-                    <input type="url" value={formData.website} onChange={e => updateField('website', e.target.value)} className="w-full p-2.5 border rounded-lg" placeholder="https://..."/>
-                </div>
-              </div>
-
-              <div className="pt-4">
-                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center"><UserCircle className="w-4 h-4 mr-2 text-slate-400"/> Ansprechpartner</h3>
-                {formData.contactPersons?.map((cp, idx) => (
-                  <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100 mb-2">
-                    <input type="text" value={cp.name} onChange={e => {
-                      const newCp = [...(formData.contactPersons || [])];
-                      newCp[idx].name = e.target.value;
-                      updateField('contactPersons', newCp);
-                    }} placeholder="Name" className="p-2 border rounded-lg text-sm"/>
-                    <input type="text" value={cp.role} onChange={e => {
-                      const newCp = [...(formData.contactPersons || [])];
-                      newCp[idx].role = e.target.value;
-                      updateField('contactPersons', newCp);
-                    }} placeholder="Funktion" className="p-2 border rounded-lg text-sm"/>
-                    <input type="email" value={cp.email} onChange={e => {
-                      const newCp = [...(formData.contactPersons || [])];
-                      newCp[idx].email = e.target.value;
-                      updateField('contactPersons', newCp);
-                    }} placeholder="E-Mail" className="p-2 border rounded-lg text-sm"/>
-                  </div>
-                ))}
-                <button type="button" onClick={() => updateField('contactPersons', [...(formData.contactPersons || []), {name: '', role: ''}])} className="text-xs font-bold text-blue-600 flex items-center mt-2 hover:underline"><Plus className="w-3 h-3 mr-1"/> Weiteren Ansprechpartner hinzufügen</button>
               </div>
             </div>
           )}
@@ -170,43 +149,19 @@ export const ContactForm: React.FC<ContactFormProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Straße & Hausnummer</label>
-                    <input type="text" value={formData.street} onChange={e => updateField('street', e.target.value)} className="w-full p-2.5 border rounded-lg"/>
+                    <input type="text" value={formData.street || ''} onChange={e => updateField('street', e.target.value)} className="w-full p-2.5 border rounded-lg"/>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">PLZ</label>
-                    <input type="text" value={formData.zip} onChange={e => handleZipLookup(e.target.value)} className="w-full p-2.5 border rounded-lg"/>
+                    <input type="text" value={formData.zip || ''} onChange={e => handleZipLookup(e.target.value)} className="w-full p-2.5 border rounded-lg"/>
                   </div>
                   <div className="col-span-2">
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex justify-between">
                         Ort {isLoadingCity && <Loader2 className="w-3 h-3 animate-spin"/>}
                     </label>
-                    <input type="text" value={formData.city} onChange={e => updateField('city', e.target.value)} className="w-full p-2.5 border rounded-lg"/>
+                    <input type="text" value={formData.city || ''} onChange={e => updateField('city', e.target.value)} className="w-full p-2.5 border rounded-lg"/>
                   </div>
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Land</label>
-                    <input type="text" value={formData.country} onChange={e => updateField('country', e.target.value)} className="w-full p-2.5 border rounded-lg"/>
-                </div>
-              </div>
-
-              <div className="pt-6 border-t border-slate-100">
-                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center"><Truck className="w-4 h-4 mr-2 text-slate-400"/> Lieferdetails</h3>
-                <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lieferbedingungen</label>
-                            <input type="text" value={formData.deliveryTerms} onChange={e => updateField('deliveryTerms', e.target.value)} className="w-full p-2.5 border rounded-lg" placeholder="z.B. frei Haus"/>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bevorzugte Versandart</label>
-                            <input type="text" value={formData.shippingMethod} onChange={e => updateField('shippingMethod', e.target.value)} className="w-full p-2.5 border rounded-lg" placeholder="z.B. Spedition"/>
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Abweichende Lieferadresse</label>
-                        <textarea value={formData.altDeliveryAddress} onChange={e => updateField('altDeliveryAddress', e.target.value)} className="w-full p-2.5 border rounded-lg h-20 text-sm" placeholder="Nur falls abweichend..."/>
-                    </div>
                 </div>
               </div>
             </div>
@@ -216,44 +171,12 @@ export const ContactForm: React.FC<ContactFormProps> = ({
             <div className="space-y-6 animate-fadeIn">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">USt-IdNr.</label>
+                    <input type="text" value={formData.vatId || ''} onChange={e => updateField('vatId', e.target.value.toUpperCase())} className="w-full p-2.5 border rounded-lg font-mono" placeholder="DE..."/>
+                </div>
+                <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Zahlungsziel (Tage)</label>
-                    <input type="number" value={formData.paymentTermsDays} onChange={e => updateField('paymentTermsDays', parseInt(e.target.value))} className="w-full p-2.5 border rounded-lg font-bold"/>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Skonto (%)</label>
-                    <input type="number" step="0.1" value={formData.discountRate} onChange={e => updateField('discountRate', parseFloat(e.target.value))} className="w-full p-2.5 border rounded-lg"/>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Frist (Tage)</label>
-                    <input type="number" value={formData.discountDays} onChange={e => updateField('discountDays', parseInt(e.target.value))} className="w-full p-2.5 border rounded-lg"/>
-                  </div>
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kreditlimit (€)</label>
-                    <input type="number" value={formData.creditLimit} onChange={e => updateField('creditLimit', parseFloat(e.target.value))} className="w-full p-2.5 border rounded-lg"/>
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{isVendor ? 'Kreditorenkonto (Sammelkonto)' : 'Debitorenkonto (Sammelkonto)'}</label>
-                    <input type="text" value={formData.glAccount} onChange={e => updateField('glAccount', e.target.value)} className="w-full p-2.5 border rounded-lg font-mono" placeholder={isVendor ? '1600000' : '1400000'}/>
-                </div>
-              </div>
-
-              <div className="pt-6 border-t border-slate-100">
-                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center"><BadgeEuro className="w-4 h-4 mr-2 text-slate-400"/> Steuerdaten</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">USt-IdNr.</label>
-                        <input type="text" value={formData.vatId} onChange={e => updateField('vatId', e.target.value.toUpperCase())} className="w-full p-2.5 border rounded-lg font-mono" placeholder="DE123456789"/>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Steuerstatus</label>
-                        <select value={formData.taxStatus} onChange={e => updateField('taxStatus', e.target.value)} className="w-full p-2.5 border rounded-lg bg-white">
-                            <option value="DOMESTIC">Inland</option>
-                            <option value="EU">EU-Ausland (Reverse Charge)</option>
-                            <option value="THIRD">Drittland (Steuerfrei)</option>
-                        </select>
-                    </div>
+                    <input type="number" value={formData.paymentTermsDays || 14} onChange={e => updateField('paymentTermsDays', parseInt(e.target.value))} className="w-full p-2.5 border rounded-lg font-bold"/>
                 </div>
               </div>
             </div>
@@ -263,87 +186,32 @@ export const ContactForm: React.FC<ContactFormProps> = ({
             <div className="space-y-6 animate-fadeIn">
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-6">
                   <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">IBAN</label>
+                      <input type="text" value={formData.iban || ''} onChange={e => handleIbanChange(e.target.value)} className="w-full p-2.5 border rounded-lg font-mono" placeholder="DE..."/>
+                  </div>
+                  <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bankname</label>
-                      <input type="text" value={formData.bankName} onChange={e => updateField('bankName', e.target.value)} className="w-full p-2.5 border rounded-lg"/>
+                      <input type="text" value={formData.bankName || ''} onChange={e => updateField('bankName', e.target.value)} className="w-full p-2.5 border rounded-lg"/>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">IBAN</label>
-                        <input type="text" value={formData.iban} onChange={e => handleIbanChange(e.target.value)} className="w-full p-2.5 border rounded-lg font-mono" placeholder="DE..."/>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">BIC</label>
-                        <input type="text" value={formData.bic} onChange={e => updateField('bic', e.target.value.toUpperCase())} className="w-full p-2.5 border rounded-lg font-mono"/>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100">
-                    <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-slate-400"/> SEPA-Lastschrift (Lastschriftmandat)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mandatsreferenz</label>
-                            <input type="text" value={formData.sepaMandateReference} onChange={e => updateField('sepaMandateReference', e.target.value)} className="w-full p-2.5 border rounded-lg font-mono"/>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Datum des Mandats</label>
-                            <input type="date" value={formData.sepaMandateDate} onChange={e => updateField('sepaMandateDate', e.target.value)} className="w-full p-2.5 border rounded-lg"/>
-                        </div>
-                    </div>
                 </div>
             </div>
           )}
 
           {activeTab === 'internal' && (
             <div className="space-y-6 animate-fadeIn">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kategorie</label>
-                    <input type="text" value={formData.category} onChange={e => updateField('category', e.target.value)} className="w-full p-2.5 border rounded-lg" placeholder="z.B. A-Kunde"/>
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Default Kostenstelle</label>
-                    <select value={formData.defaultCostCenterId} onChange={e => updateField('defaultCostCenterId', e.target.value)} className="w-full p-2.5 border rounded-lg bg-white">
-                        <option value="">-- Keine --</option>
-                        {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.code} {cc.name}</option>)}
-                    </select>
-                </div>
-              </div>
-
               <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Interne Notizen</label>
-                  <textarea value={formData.notes} onChange={e => updateField('notes', e.target.value)} className="w-full p-2.5 border rounded-lg h-32 text-sm"/>
-              </div>
-
-              <div className="pt-6 border-t border-slate-100">
-                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center"><ShieldAlert className="w-4 h-4 mr-2 text-red-500"/> Mahnwesen & Sperren</h3>
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mahnregeln</label>
-                            <input type="text" value={formData.dunningRules} onChange={e => updateField('dunningRules', e.target.value)} className="w-full p-2.5 border rounded-lg" placeholder="z.B. Kulant"/>
-                        </div>
-                        <div className="flex items-center gap-3 p-4 bg-red-50 rounded-xl border border-red-100 h-fit self-end">
-                            <input type="checkbox" id="block-check" checked={formData.isBlocked} onChange={e => updateField('isBlocked', e.target.checked)} className="w-5 h-5 rounded text-red-600 focus:ring-red-500"/>
-                            <label htmlFor="block-check" className="text-sm font-bold text-red-800 cursor-pointer">Konto gesperrt</label>
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sperrvermerk / Grund</label>
-                        <input type="text" value={formData.blockNote} onChange={e => updateField('blockNote', e.target.value)} className="w-full p-2.5 border rounded-lg" placeholder="z.B. Nur gegen Vorkasse liefern"/>
-                    </div>
-                </div>
+                  <textarea value={formData.notes || ''} onChange={e => updateField('notes', e.target.value)} className="w-full p-2.5 border rounded-lg h-32 text-sm"/>
               </div>
             </div>
           )}
-
         </form>
 
         <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
             <button type="button" onClick={onClose} className="px-5 py-2.5 border border-slate-300 rounded-xl text-slate-700 hover:bg-white transition-colors text-sm font-medium">Abbrechen</button>
-            <button onClick={handleSubmit} className={`flex items-center px-8 py-2.5 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-95 ${isVendor ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+            <button type="submit" form="contact-form" className={`flex items-center px-8 py-2.5 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-95 ${isVendor ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
                 <Save className="w-4 h-4 mr-2" />
-                Stammdaten speichern
+                Daten übernehmen
             </button>
         </div>
       </div>

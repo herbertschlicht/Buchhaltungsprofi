@@ -14,7 +14,7 @@ import { TransactionForm } from './components/TransactionForm';
 import { AIAssistantView } from './components/AIAssistantView';
 import { ControllingView } from './components/ControllingView';
 import { ClosingView } from './components/ClosingView';
-import { Account, AccountType, Contact, ContactType, Transaction, TransactionType, Invoice, PurchaseOrder, PurchaseOrderStatus, CompanySettings, Asset, ClientProfile, CostCenter, Project } from './types';
+import { Account, AccountType, Contact, ContactType, Transaction, TransactionType, Invoice, PurchaseOrder, CompanySettings, Asset, ClientProfile, CostCenter, Project } from './types';
 import { skr03Accounts } from './data/skr03';
 
 // --- INITIAL DATA SEEDING ---
@@ -64,11 +64,10 @@ const initialCompanySettings: CompanySettings = {
 };
 
 const initialContacts: Contact[] = [
-  { id: 'D10000', name: 'Müller GmbH', type: ContactType.CUSTOMER, city: 'München' },
-  { id: 'K70000', name: 'Immobilien Meier', type: ContactType.VENDOR, city: 'Hamburg' }
+  { id: 'D10000', name: 'Müller Bau GmbH', type: ContactType.CUSTOMER, city: 'München', glAccount: '1400000' },
+  { id: 'K70000', name: 'Baustoff-Union SE', type: ContactType.VENDOR, city: 'Hamburg', glAccount: '1600000' }
 ];
 
-// Helper to safely load from localStorage
 function useStickyState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [state, setState] = useState<T>(() => {
     try {
@@ -90,7 +89,6 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   
-  // Persistent State
   const [companySettings, setCompanySettings] = useStickyState<CompanySettings>('settings', initialCompanySettings);
   const [transactions, setTransactions] = useStickyState<Transaction[]>('transactions', []);
   const [accounts, setAccounts] = useStickyState<Account[]>('accounts', initialAccounts);
@@ -101,69 +99,22 @@ const App: React.FC = () => {
   const [costCenters, setCostCenters] = useStickyState<CostCenter[]>('costCenters', []);
   const [projects, setProjects] = useStickyState<Project[]>('projects', []);
 
-  // Multi-Tenancy
   const [clients, setClients] = useStickyState<ClientProfile[]>('clients', [{ id: '1', name: 'Demo Mandant', created: new Date().toISOString() }]);
   const [activeClientId, setActiveClientId] = useStickyState<string>('activeClientId', '1');
 
   const currentYear = new Date().getFullYear();
   const [nextInvoiceNum, setNextInvoiceNum] = useStickyState<string>('nextInvoiceNum', `RE-${currentYear}-1001`);
-  const [nextIncomingInvoiceNum, setNextIncomingInvoiceNum] = useStickyState<string>('nextIncomingInvoiceNum', `ER-${currentYear}-001`);
-  const [nextOrderNum, setNextOrderNum] = useStickyState<string>('nextOrderNum', `B-${currentYear}-001`);
-
-  const nextAssetId = `INV-${currentYear}-${(assets.length + 1).toString().padStart(3, '0')}`;
 
   const handleSaveTransaction = (transaction: Transaction) => {
     setTransactions(prev => [transaction, ...prev]);
   };
 
-  const handleSaveAsset = (asset: Asset) => {
-      setAssets(prev => {
-          const exists = prev.findIndex(a => a.id === asset.id);
-          if (exists >= 0) {
-              const updated = [...prev];
-              updated[exists] = asset;
-              return updated;
-          }
-          return [...prev, asset];
-      });
-  };
-
-  // Fixed handleSaveInvoice logic to match the snippet requirement
   const handleSaveInvoice = (invoice: Invoice, transaction: Transaction, newAsset?: Asset) => {
     setInvoices(prev => [...prev, invoice]);
     setTransactions(prev => [transaction, ...prev]);
-    
-    if (newAsset) handleSaveAsset(newAsset);
-
-    try {
-        const parts = invoice.number.split('-');
-        const numPart = parseInt(parts[parts.length - 1]);
-        if (!isNaN(numPart)) {
-            const newNum = numPart + 1;
-            const prefix = parts.slice(0, parts.length - 1).join('-');
-            const nextStr = `${prefix}-${newNum.toString().padStart(3, '0')}`; 
-
-            if (invoice.number.startsWith("RE-")) {
-                 setNextInvoiceNum(nextStr);
-            } else if (invoice.number.startsWith("ER-")) {
-                 setNextIncomingInvoiceNum(nextStr);
-            }
-        }
-    } catch (e) {}
+    if (newAsset) setAssets(prev => [...prev, newAsset]);
   };
 
-  const handleSavePurchaseOrder = (order: PurchaseOrder, transaction?: Transaction, invoice?: Invoice) => {
-      setPurchaseOrders(prev => {
-          const exists = prev.find(o => o.id === order.id);
-          if (exists) return prev.map(o => o.id === order.id ? order : o);
-          return [...prev, order];
-      });
-
-      if (transaction && invoice) {
-          handleSaveInvoice(invoice, transaction);
-      }
-  };
-  
   const handleUpdateInvoice = (updatedInvoice: Invoice) => {
       setInvoices(prev => prev.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv));
   };
@@ -249,19 +200,15 @@ const App: React.FC = () => {
                 accounts={accounts} 
                 invoices={invoices}
                 companySettings={companySettings}
-                purchaseOrders={purchaseOrders} 
-                onSavePurchaseOrder={handleSavePurchaseOrder} 
                 onSaveInvoice={handleSaveInvoice}
                 onAddContact={handleAddContact}
-                nextInvoiceNumber={nextIncomingInvoiceNum} 
-                nextOrderNumber={nextOrderNum} 
-                nextAssetId={nextAssetId}
+                nextInvoiceNumber={nextInvoiceNum} 
             />
         );
       case 'payments':
         return <PaymentsView transactions={transactions} accounts={accounts} contacts={contacts} invoices={invoices} companySettings={companySettings} />;
       case 'assets':
-        return <AssetAccountingView transactions={transactions} accounts={accounts} assets={assets} onBookDepreciation={handleSaveTransaction} onSaveAsset={handleSaveAsset} />;
+        return <AssetAccountingView transactions={transactions} accounts={accounts} assets={assets} onBookDepreciation={handleSaveTransaction} onSaveAsset={(a) => setAssets([...assets, a])} />;
       case 'payroll': 
         return <PayrollView transactions={transactions} accounts={accounts} onSaveTransaction={handleSaveTransaction} />;
       case 'reports':

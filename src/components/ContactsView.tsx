@@ -234,6 +234,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
             transactions={transactions}
             nextInvoiceNumber={nextInvoiceNumber}
             onSave={onSaveInvoice}
+            onAddContact={onAddContact || (() => {})} // Sicherstellen, dass die Prop weitergereicht wird
             onClose={() => setShowInvoiceForm(false)} 
         />
       )}

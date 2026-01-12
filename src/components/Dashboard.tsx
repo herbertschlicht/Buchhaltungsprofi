@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Transaction, Account, AccountType } from '../types';
 import { generateFinancialInsight } from '../services/geminiService';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
-import { Sparkles, TrendingUp, TrendingDown, DollarSign, Wallet, AlertTriangle } from 'lucide-react';
+import { Sparkles, TrendingUp, TrendingDown, DollarSign, Wallet, AlertTriangle, Activity } from 'lucide-react';
 
 interface DashboardProps {
   transactions: Transaction[];
@@ -12,6 +12,7 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ transactions, accounts }) => {
   const [insight, setInsight] = useState<string>("");
+  const [tokensUsed, setTokensUsed] = useState<number | null>(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
 
   // Calculate High Level Metrics
@@ -50,9 +51,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, accounts }) 
   const handleGenerateInsight = async () => {
     setLoadingInsight(true);
     setInsight(""); // Reset old insight
+    setTokensUsed(null);
     try {
         const result = await generateFinancialInsight(transactions, accounts);
-        setInsight(result);
+        // Correctly access .text from the result object
+        setInsight(result.text);
+        setTokensUsed(result.totalTokens);
     } catch (error) {
         console.error("Analysis failed", error);
         setInsight("Die Analyse konnte momentan nicht durchgeführt werden. Bitte überprüfen Sie Ihre Internetverbindung oder den API-Schlüssel.");
@@ -89,8 +93,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, accounts }) 
       </div>
 
       {insight && (
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 p-6 rounded-3xl text-indigo-900 animate-fadeIn shadow-inner">
-            <h3 className="font-bold flex items-center mb-3 text-lg"><Sparkles className="w-5 h-5 mr-2 text-purple-600"/> KI-Analyse Ergebnis</h3>
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 p-6 rounded-3xl text-indigo-900 animate-fadeIn shadow-inner relative">
+            <div className="flex justify-between items-start mb-3">
+                <h3 className="font-bold flex items-center text-lg"><Sparkles className="w-5 h-5 mr-2 text-purple-600"/> KI-Analyse Ergebnis</h3>
+                {tokensUsed !== null && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/60 border border-indigo-200 rounded-full text-[10px] font-bold text-indigo-600 shadow-sm">
+                        <Activity className="w-3 h-3" />
+                        {tokensUsed.toLocaleString()} TOKENS
+                    </div>
+                )}
+            </div>
             <p className="text-base leading-relaxed text-slate-700 whitespace-pre-wrap">{insight}</p>
         </div>
       )}

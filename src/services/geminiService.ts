@@ -1,25 +1,77 @@
 
-import { GoogleGenAI, Chat } from "@google/genai";
+import { GoogleGenAI, Chat, Type } from "@google/genai";
 import { Transaction, Account, AccountType } from "../types";
 
 declare const process: any;
 
 const apiKey = process.env.API_KEY || '';
 
-// Safely initialize the AI client only if the key exists (handled in UI if missing)
 const getAiClient = () => {
   if (!apiKey) return null;
   return new GoogleGenAI({ apiKey });
 };
 
+export interface AiResponse {
+    text: string;
+    totalTokens: number;
+}
+
+/**
+ * EXTRAHIERT RECHNUNGSDATEN AUS EINEM DOKUMENT (BILD/PDF)
+ */
+export const extractInvoiceData = async (base64Data: string, mimeType: string) => {
+    const ai = getAiClient();
+    if (!ai) return null;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: [{
+                parts: [
+                    { inlineData: { data: base64Data, mimeType: mimeType } },
+                    { text: "Analysiere diesen Beleg und extrahiere alle verfügbaren Daten. Achte besonders auf die Kontaktdaten des Ausstellers (vendorName, street, zip, city, vatId). Zudem: Belegdatum (date YYYY-MM-DD), Rechnungsnummer (invoiceNumber), Nettobetrag (netAmount), Steuersatz (taxRate 7/19) und Beschreibung. Antworte ausschließlich im JSON Format." }
+                ]
+            }],
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        vendorName: { type: Type.STRING },
+                        street: { type: Type.STRING },
+                        zip: { type: Type.STRING },
+                        city: { type: Type.STRING },
+                        vatId: { type: Type.STRING },
+                        date: { type: Type.STRING },
+                        invoiceNumber: { type: Type.STRING },
+                        netAmount: { type: Type.NUMBER },
+                        taxRate: { type: Type.NUMBER },
+                        description: { type: Type.STRING }
+                    },
+                    required: ["vendorName", "netAmount"]
+                }
+            }
+        });
+
+        const text = response.text;
+        if (!text) return null;
+        return JSON.parse(text);
+    } catch (error) {
+        console.error("Smart Scan Error:", error);
+        return null;
+    }
+};
+
+/**
+ * Generiert eine finanzielle Zusammenfassung und Empfehlungen.
+ */
 export const generateFinancialInsight = async (
   transactions: Transaction[],
   accounts: Account[]
-): Promise<string> => {
+): Promise<AiResponse> => {
   const ai = getAiClient();
-  if (!ai) return "API-Schlüssel fehlt. Bitte konfigurieren Sie Ihre Umgebung.";
+  if (!ai) return { text: "API-Schlüssel fehlt.", totalTokens: 0 };
 
-  // Summarize data for the prompt to save tokens
   const revenue = transactions.flatMap(t => t.lines).reduce((acc, line) => {
      const account = accounts.find(a => a.id === line.accountId);
      if (account?.type === AccountType.REVENUE) return acc + line.credit;
@@ -33,34 +85,32 @@ export const generateFinancialInsight = async (
  }, 0);
 
   const prompt = `
-    Sie sind ein erfahreier Buchhalter. Analysieren Sie die folgende Zusammenfassung:
-    Gesamteinnahmen: ${revenue.toFixed(2)} €
-    Gesamtausgaben: ${expenses.toFixed(2)} €
-    Nettoergebnis: ${(revenue - expenses).toFixed(2)} €
-    Anzahl der Transaktionen: ${transactions.length}
-
-    Bitte geben Sie eine prägnante Zusammenfassung (max. 3 Sätze) der finanziellen Gesundheit und einen umsetzbaren Verbesserungstipp auf Deutsch.
+    Analysiere: Einnahmen ${revenue}€, Ausgaben ${expenses}€. 
+    Gib eine kurze Analyse und einen Tipp auf Deutsch.
   `;
 
   try {
-    // Using gemini-3-flash-preview as per guidelines for basic text tasks
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
     });
-    return response.text || "Konnte keine Einsicht generieren.";
+    return { 
+        text: response.text || "Keine Analyse möglich.",
+        totalTokens: response.usageMetadata?.totalTokenCount || 0
+    };
   } catch (error) {
-    console.error("KI-Fehler:", error);
-    return "Finanzanalyse derzeit nicht möglich.";
+    return { text: "Fehler bei der KI-Analyse.", totalTokens: 0 };
   }
 };
 
+/**
+ * Schlägt eine Buchungskategorie basierend auf der Beschreibung vor.
+ */
 export const suggestTransactionCategory = async (description: string): Promise<string | null> => {
     const ai = getAiClient();
     if (!ai) return null;
 
     try {
-        // Using gemini-3-flash-preview as per guidelines
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: `Gegeben ist die Transaktionsbeschreibung "${description}", schlagen Sie die wahrscheinlichste Buchungskategorie vor (z.B. Bürobedarf, Reisekosten, Umsatz, Nebenkosten, Beratungsleistungen). Antworten Sie NUR mit dem Kategorienamen auf Deutsch.`,
@@ -69,102 +119,50 @@ export const suggestTransactionCategory = async (description: string): Promise<s
     } catch (e) {
         return null;
     }
-}
+};
 
-// --- NEW: AI COACH FUNCTIONALITY ---
-
+// --- AI COACH ---
 let chatSession: Chat | null = null;
 
-export const  initializeCoachChat = () => {
+export const initializeCoachChat = () => {
     const ai = getAiClient();
     if (!ai) return null;
-
-    const systemInstruction = `
-        Du bist "Buchi", ein freundlicher, geduldiger und lustiger Buchhaltungs-Coach für absolute Anfänger.
-        Deine Aufgabe ist es, dem Nutzer die doppelte Buchführung, Steuern und Finanzen von Grund auf zu erklären.
-        
-        Regeln:
-        1. Stelle dem Nutzer Fragen, um sein Verständnis zu prüfen oder sein Geschäft zu verstehen (z.B. "Verkaufst du Waren oder Dienstleistungen?").
-        2. Verwende einfache Sprache, keine Fachbegriffe ohne Erklärung. Nutze Emojis 🎓🚀.
-        3. Wenn ein Konzept visuell erklärt werden sollte (z.B. wie eine Rechnung aussieht, ein T-Konto, ein Geldsack für Gewinn), dann füge am Ende deiner Antwort folgenden Tag ein:
-           [GENERATE_IMAGE: <detaillierte englische beschreibung des bildes>]
-           Beispiel: Das ist ein T-Konto. [GENERATE_IMAGE: A simple accounting T-Account diagram sketched on paper, showing Debit on left and Credit on right]
-        4. Führe den Nutzer Schritt für Schritt. Überfordere ihn nicht.
-    `;
-
     chatSession = ai.chats.create({
-        // Using gemini-3-flash-preview as per guidelines for complex text tasks
         model: "gemini-3-flash-preview",
         config: {
-            systemInstruction: systemInstruction,
+            systemInstruction: "Du bist Buchi, ein Buchhaltungs-Coach. Erkläre Konzepte einfach mit Emojis.",
             temperature: 0.7,
         }
     });
-
     return chatSession;
 };
 
 export const sendMessageToCoach = async (message: string): Promise<{ text: string, imagePrompt?: string, totalTokens: number }> => {
     if (!chatSession) initializeCoachChat();
-    if (!chatSession) return { text: "Fehler: KI nicht initialisiert.", totalTokens: 0 };
-
+    if (!chatSession) return { text: "KI nicht bereit.", totalTokens: 0 };
     try {
         const result = await chatSession.sendMessage({ message });
-        let text = result.text || "";
-        // Extract token usage metadata for the UI
-        const totalTokens = result.usageMetadata?.totalTokenCount || 0;
-        
-        // Check for Image Tag
-        let imagePrompt = undefined;
-        const imgTagRegex = /\[GENERATE_IMAGE: (.*?)\]/;
-        const match = text.match(imgTagRegex);
-        
-        if (match) {
-            imagePrompt = match[1];
-            text = text.replace(match[0], '').trim(); // Remove tag from display text
-        }
-
-        return { text, imagePrompt, totalTokens };
-    } catch (error) {
-        console.error("Chat Error:", error);
-        return { text: "Entschuldigung, ich habe gerade Verbindungsprobleme. Versuche es gleich nochmal! 🤯", totalTokens: 0 };
+        const text = result.text || "";
+        const imgMatch = text.match(/\[GENERATE_IMAGE: (.*?)\]/);
+        return { 
+            text: text.replace(/\[GENERATE_IMAGE: .*?\]/, '').trim(), 
+            imagePrompt: imgMatch ? imgMatch[1] : undefined,
+            totalTokens: result.usageMetadata?.totalTokenCount || 0
+        };
+    } catch (e) {
+        return { text: "Fehler.", totalTokens: 0 };
     }
 };
 
 export const generateCoachImage = async (prompt: string): Promise<string | null> => {
     const ai = getAiClient();
     if (!ai) return null;
-
     try {
-        // Updated to use the preferred gemini-2.5-flash-image model with generateContent for images
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
-            contents: {
-              parts: [
-                {
-                  text: `A friendly, clean, educational illustration style: ${prompt}`,
-                },
-              ],
-            },
+            contents: { parts: [{ text: `Educational sketch: ${prompt}` }] },
         });
-
-        // Safe check for candidates and parts to satisfy TypeScript compiler
-        const candidates = response.candidates;
-        if (!candidates || candidates.length === 0) return null;
-
-        const parts = candidates[0].content?.parts;
-        if (!parts) return null;
-
-        // Iterate through response parts to find the inline image data
-        for (const part of parts) {
-            if (part.inlineData?.data) {
-                const base64EncodeString: string = part.inlineData.data;
-                return `data:image/png;base64,${base64EncodeString}`;
-            }
-        }
-        return null;
-    } catch (error) {
-        console.error("Image Gen Error:", error);
-        return null;
-    }
+        const data = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+        return data ? `data:image/png;base64,${data}` : null;
+    } catch (e) { return null; }
 };
