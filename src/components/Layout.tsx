@@ -14,7 +14,6 @@ import {
   ArrowLeftRight,
   UserCheck,
   Building,
-  LogOut,
   Plus,
   ChevronsUpDown,
   Check,
@@ -90,8 +89,6 @@ export const Layout: React.FC<LayoutProps> = ({
     }
   ];
 
-  // Added React.FC type definition to fix: Type '{ key: string; item: any; }' is not assignable to type '{ item: any; }'.
-  // Using React.FC implicitly allows the 'key' prop in JSX.
   const NavItem: React.FC<{ item: any }> = ({ item }) => {
     const isActive = activeTab === item.id;
     const Icon = item.icon;
