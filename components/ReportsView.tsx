@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo } from 'react';
 import { Transaction, Account, AccountType, CompanySettings } from '../types';
-import { Calculator, AlertCircle, CheckCircle, Printer, Building2, FileText, PieChart, Search, ChevronDown, ChevronRight, Calendar } from 'lucide-react';
+import { Calculator, AlertCircle, CheckCircle, Printer, Building2, FileText, PieChart, Search, ChevronDown, ChevronRight, Calendar, AlertTriangle } from 'lucide-react';
 
 interface ReportsViewProps {
   transactions: Transaction[];
@@ -8,16 +9,14 @@ interface ReportsViewProps {
   companySettings: CompanySettings;
 }
 
-// --- HGB STRUCTURE DEFINITIONS ---
-
 type ReportGroup = {
     id: string;
     label: string;
-    parent?: string; // For nesting
+    parent?: string; 
     isTotal?: boolean;
 };
 
-// Definition der GuV Zeilen (Staffelform)
+// GuV (SKR 03)
 const GUV_STRUCTURE: ReportGroup[] = [
     { id: 'revenue', label: '1. Umsatzerlöse' },
     { id: 'revenue_other', label: '2. Sonstige betriebliche Erträge' },
@@ -29,7 +28,7 @@ const GUV_STRUCTURE: ReportGroup[] = [
     { id: 'taxes', label: '8. Steuern vom Einkommen und Ertrag' },
 ];
 
-// Definition der Bilanz Aktiva (Prefix act_)
+// Bilanz Aktiva (SKR 03)
 const BILANZ_AKTIVA_STRUCTURE: ReportGroup[] = [
     { id: 'act_A', label: 'A. Anlagevermögen', isTotal: true },
     { id: 'act_A_I', label: 'I. Immaterielle Vermögensgegenstände', parent: 'act_A' },
@@ -39,17 +38,17 @@ const BILANZ_AKTIVA_STRUCTURE: ReportGroup[] = [
     { id: 'act_B', label: 'B. Umlaufvermögen', isTotal: true },
     { id: 'act_B_I', label: 'I. Vorräte', parent: 'act_B' },
     { id: 'act_B_II', label: 'II. Forderungen und sonstige Vermögensgegenstände', parent: 'act_B' },
-    { id: 'act_B_III', label: 'III. Kassenbestand, Bundesbankguthaben, Guthaben bei Kreditinstituten', parent: 'act_B' }, // Flüssige Mittel
+    { id: 'act_B_III', label: 'III. Kassenbestand, Bundesbankguthaben, Guthaben bei Kreditinstituten', parent: 'act_B' }, 
     
-    { id: 'act_C', label: 'C. Rechnungsabgrenzungsposten', isTotal: true } // RAP
+    { id: 'act_C', label: 'C. Rechnungsabgrenzungsposten', isTotal: true } 
 ];
 
-// Definition der Bilanz Passiva (Prefix pas_)
+// Bilanz Passiva (SKR 03)
 const BILANZ_PASSIVA_STRUCTURE: ReportGroup[] = [
     { id: 'pas_A', label: 'A. Eigenkapital', isTotal: true },
     { id: 'pas_A_I', label: 'I. Kapital / Einlagen', parent: 'pas_A' },
-    { id: 'pas_A_II', label: 'II. Gewinnvortrag / Verlustvortrag', parent: 'pas_A' }, // Previous Years Result
-    { id: 'pas_A_III', label: 'III. Jahresüberschuss / Jahresfehlbetrag', parent: 'pas_A' }, // Current Year Result
+    { id: 'pas_A_II', label: 'II. Gewinnvortrag / Verlustvortrag', parent: 'pas_A' }, 
+    { id: 'pas_A_III', label: 'III. Jahresüberschuss / Jahresfehlbetrag', parent: 'pas_A' }, 
     { id: 'pas_A_IV', label: 'IV. Entnahmen / Einlagen (Privat)', parent: 'pas_A' },
 
     { id: 'pas_B', label: 'B. Rückstellungen', isTotal: true },
@@ -63,223 +62,226 @@ const BILANZ_PASSIVA_STRUCTURE: ReportGroup[] = [
 export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts, companySettings }) => {
   const [activeReport, setActiveReport] = useState<'income' | 'balance' | 'vat' | 'reconciliation'>('income');
   
-  // Year Selection State
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [reportDate, setReportDate] = useState(`${currentYear}-12-31`);
 
-  // Update report date when year changes
   const handleYearChange = (year: number) => {
       setSelectedYear(year);
       setReportDate(`${year}-12-31`);
   };
 
-  // Determine available years from transactions
   const availableYears = useMemo(() => {
       const years = new Set<number>(transactions.map(t => new Date(t.date).getFullYear()));
-      years.add(currentYear); // Ensure current year is always available
+      years.add(currentYear); 
       return Array.from(years).sort((a, b) => b - a);
   }, [transactions, currentYear]);
 
   // --- ENGINE: Map Accounts to Categories based on SKR03 Code Ranges ---
   const mapAccountToCategory = (account: Account): string => {
-      const c = parseInt(account.code);
+      const c = parseInt(account.code.substring(0, 4));
       
-      // --- GuV (P&L) Mapping ---
       if (account.type === AccountType.REVENUE) {
           if (c >= 8000 && c <= 8999 && !account.name.includes('Eigenverbrauch')) return 'revenue';
-          if (c >= 2600 && c <= 2799) return 'revenue_other'; // Zinserträge etc
+          if (c >= 2600 && c <= 2799) return 'revenue_other'; 
           if (account.name.includes('Eigenverbrauch') || account.name.includes('Wertabgaben')) return 'revenue_other';
-          return 'revenue_other'; // Fallback Revenue
+          return 'revenue_other'; 
       }
       if (account.type === AccountType.EXPENSE) {
           if (c >= 3000 && c <= 3999) return 'material';
           if (c >= 4100 && c <= 4199) return 'personnel';
-          if (c >= 4200 && c <= 4299) return 'other_cost'; // Raumkosten -> Sonstige
+          if (c >= 4200 && c <= 4299) return 'other_cost'; 
           if (c >= 4820 && c <= 4860) return 'depreciation';
           if (c >= 2100 && c <= 2150) return 'interest';
           if (c >= 2200 && c <= 2299) return 'taxes';
-          // Alles andere in 4xxx ist sonstige
+          
           return 'other_cost';
       }
 
-      // --- BILANZ AKTIVA Mapping (act_) ---
       if (account.type === AccountType.ASSET) {
-          // Anlagevermögen (Class 0)
-          if (c >= 10 && c <= 49) return 'act_A_I'; // Immateriell
-          if (c >= 50 && c <= 499) return 'act_A_II'; // Sachanlagen
-          if (c >= 500 && c <= 699) return 'act_A_III'; // Finanzanlagen
+          if (c >= 10 && c <= 49) return 'act_A_I'; 
+          if (c >= 50 && c <= 499) return 'act_A_II'; 
+          if (c >= 500 && c <= 699) return 'act_A_III'; 
           
-          // Umlaufvermögen (Class 1)
-          if (c >= 3960 && c <= 3980) return 'act_B_I'; // Bestände (Sonderfall SKR03 Class 3 Asset)
-          if (c >= 1400 && c <= 1499) return 'act_B_II'; // Forderungen aLL
-          if (c >= 1500 && c <= 1549) return 'act_B_II'; // Sonstige Forderungen
-          if (c >= 1000 && c <= 1399) return 'act_B_III'; // Bank/Kasse
+          if (c >= 3960 && c <= 3980) return 'act_B_I'; 
+          if (c >= 1400 && c <= 1499) return 'act_B_II'; 
+          if (c >= 1500 && c <= 1549) return 'act_B_II'; 
+          if (c >= 1000 && c <= 1399) return 'act_B_III'; 
           
-          // KORREKTUR: Vorsteuer ist Forderung ggü. Finanzamt -> B.II Sonstige Vermögensgegenstände
           if (c >= 1570 && c <= 1599) return 'act_B_II'; 
+          if (c >= 980 && c <= 990) return 'act_C'; 
           
-          if (c >= 980 && c <= 990) return 'act_C'; // RAP
-          
-          return 'act_B_II'; // Fallback Asset -> Forderungen/Sonstige
+          return 'act_B_II'; 
       }
 
-      // --- BILANZ PASSIVA Mapping (pas_) ---
       if (account.type === AccountType.LIABILITY) {
-          if (c >= 800 && c <= 999 && !account.name.includes('Rückstellung')) return 'pas_A_I'; // Sollte Equity sein, aber falls falsch typisiert
-          if (c >= 2300 && c <= 2399) return 'pas_B'; // Rückstellungen (Class 2 SKR03 special)
-          if (c >= 950 && c <= 979) return 'pas_B'; // Rückstellungen
+          if (c >= 950 && c <= 979) return 'pas_B'; 
+          if (c >= 2300 && c <= 2399) return 'pas_B'; 
           
-          if (c >= 1600 && c <= 1699) return 'pas_C_I'; // Verb. aLL
-          if (c >= 1705 && c <= 1709) return 'pas_C_II'; // Bankdarlehen
-          if (c >= 1700 && c <= 1999) return 'pas_C_III'; // Sonstige (USt, Lohn etc.)
+          if (c >= 1600 && c <= 1699) return 'pas_C_I'; 
+          if (c >= 1705 && c <= 1709) return 'pas_C_II'; 
+          if (c >= 1700 && c <= 1999) return 'pas_C_III'; 
           
           return 'pas_C_III';
       }
 
       if (account.type === AccountType.EQUITY) {
-          if (c >= 1800 && c <= 1899) return 'pas_A_IV'; // Privat (Entnahmen/Einlagen)
-          if (c >= 800 && c <= 899) return 'pas_A_I'; // Festkapital
-          if (c >= 900 && c <= 949) return 'pas_A_II'; // Vortragskonten (falls manuell gebucht)
+          if (c >= 1800 && c <= 1899) return 'pas_A_IV'; 
+          if (c >= 800 && c <= 899) return 'pas_A_I'; 
+          if (c >= 900 && c <= 949) return 'pas_A_II'; 
           return 'pas_A_I';
       }
 
       return 'uncategorized';
   };
 
-  // --- REPORT SPECIFIC CALCULATION ENGINE ---
-  // Calculates balance for an account with Year-Aware Logic
-  const calculateReportBalance = (accountId: string, type: AccountType) => {
-      let balance = 0;
-      
-      const startDateStr = `${selectedYear}-01-01`;
-      const endDateStr = reportDate; // Usually YYYY-12-31
+  const calculateYearData = (targetYear: number) => {
+      const startDate = `${targetYear}-01-01`;
+      const endDate = `${targetYear}-12-31`;
 
-      transactions.forEach(t => {
-          // Rule 1: Never include future transactions relative to report date
-          if (t.date > endDateStr) return;
+      const getAccountBalance = (acc: Account) => {
+          let bal = 0;
+          transactions.forEach(t => {
+              if (t.date > endDate) return;
+              if ((acc.type === AccountType.REVENUE || acc.type === AccountType.EXPENSE) && t.date < startDate) return;
 
-          // Rule 2: For P&L (Success Accounts), ONLY include transactions WITHIN the fiscal year
-          // Expenses and Revenues reset to 0 at the start of the year.
-          if ((type === AccountType.REVENUE || type === AccountType.EXPENSE) && t.date < startDateStr) return;
-
-          t.lines.forEach(line => {
-              if (line.accountId === accountId) {
-                  if ([AccountType.ASSET, AccountType.EXPENSE].includes(type)) {
-                      balance += line.debit - line.credit;
-                  } else {
-                      balance += line.credit - line.debit;
+              t.lines.forEach(l => {
+                  if (l.accountId === acc.id) {
+                      if ([AccountType.ASSET, AccountType.EXPENSE].includes(acc.type)) bal += l.debit - l.credit;
+                      else bal += l.credit - l.debit;
                   }
-              }
+              });
           });
-      });
-      return balance;
-  };
+          return bal;
+      };
 
-  // --- NEW: Calculate Retained Earnings (Gewinnvortrag) automatically ---
-  // Sums up Revenue - Expense for ALL years prior to the selected year.
-  const calculatePreviousYearsResult = () => {
-      let balance = 0;
-      const startDateStr = `${selectedYear}-01-01`;
+      const getCatTotal = (catId: string, type: AccountType) => {
+          return accounts
+            .filter(a => mapAccountToCategory(a) === catId && a.type === type)
+            .reduce((sum, a) => sum + getAccountBalance(a), 0);
+      };
 
+      const revenue = getCatTotal('revenue', AccountType.REVENUE);
+      const otherRevenue = getCatTotal('revenue_other', AccountType.REVENUE);
+      const material = getCatTotal('material', AccountType.EXPENSE);
+      const personnel = getCatTotal('personnel', AccountType.EXPENSE);
+      const depreciation = getCatTotal('depreciation', AccountType.EXPENSE);
+      const otherCost = getCatTotal('other_cost', AccountType.EXPENSE);
+      const interest = getCatTotal('interest', AccountType.EXPENSE);
+      const taxes = getCatTotal('taxes', AccountType.EXPENSE);
+
+      const totalIncome = revenue + otherRevenue;
+      const totalExpense = material + personnel + depreciation + otherCost + interest + taxes;
+      const netResult = totalIncome - totalExpense;
+
+      let retainedEarnings = 0;
       transactions.forEach(t => {
-          // Strict Filter: Only transactions BEFORE the current year
-          if (t.date >= startDateStr) return;
+          if (t.date < startDate) {
+              t.lines.forEach(l => {
+                  const a = accounts.find(acc => acc.id === l.accountId);
+                  if (a?.type === AccountType.REVENUE) retainedEarnings += l.credit - l.debit;
+                  else if (a?.type === AccountType.EXPENSE) retainedEarnings += l.credit - l.debit;
+              });
+          }
+      });
 
-          t.lines.forEach(line => {
-              const acc = accounts.find(a => a.id === line.accountId);
-              if (!acc) return;
+      const values: Record<string, number> = {
+          revenue, revenue_other: otherRevenue, material, personnel, depreciation, other_cost: otherCost, interest, taxes,
+          netResult, retainedEarnings
+      };
 
-              // Add Revenue (Credit positive)
-              if (acc.type === AccountType.REVENUE) {
-                  balance += line.credit - line.debit;
-              }
-              // Subtract Expense (Debit negative for Equity logic)
-              else if (acc.type === AccountType.EXPENSE) {
-                  balance += line.credit - line.debit; // Expense debit reduces equity
+      [...BILANZ_AKTIVA_STRUCTURE, ...BILANZ_PASSIVA_STRUCTURE].forEach(group => {
+          if (group.id === 'pas_A_III') {
+              values[group.id] = netResult;
+          } else if (group.id === 'pas_A_II') {
+              values[group.id] = getCatTotal(group.id, AccountType.EQUITY) + retainedEarnings;
+          } else {
+              const type = group.id.startsWith('act') ? AccountType.ASSET : (group.id.startsWith('pas_A') ? AccountType.EQUITY : AccountType.LIABILITY);
+              values[group.id] = getCatTotal(group.id, type);
+          }
+      });
+
+      const processTreeTotals = (structure: ReportGroup[]) => {
+          structure.filter(g => g.isTotal).forEach(parent => {
+              const children = structure.filter(c => c.parent === parent.id);
+              if (children.length > 0) {
+                  values[parent.id] = children.reduce((sum, child) => {
+                      if (child.id === 'pas_A_III') return sum + netResult;
+                      if (child.id === 'pas_A_II') return sum + values[child.id];
+                      return sum + values[child.id];
+                  }, 0);
               }
           });
-      });
-      return balance;
+      };
+
+      processTreeTotals(BILANZ_AKTIVA_STRUCTURE);
+      processTreeTotals(BILANZ_PASSIVA_STRUCTURE);
+
+      const sumAktiva = BILANZ_AKTIVA_STRUCTURE.filter(g => !g.parent).reduce((s, g) => s + values[g.id], 0);
+      const sumPassiva = BILANZ_PASSIVA_STRUCTURE.filter(g => !g.parent).reduce((s, g) => s + values[g.id], 0);
+
+      return { values, sumAktiva, sumPassiva, netResult };
   };
 
-  const getCategoryTotal = (categoryId: string, type: AccountType) => {
-      // FIX: Strict filtering by type to avoid ID collisions between Assets and Equity
-      const relevantAccounts = accounts.filter(a => mapAccountToCategory(a) === categoryId && a.type === type);
-      return relevantAccounts.reduce((sum, acc) => sum + calculateReportBalance(acc.id, acc.type), 0);
-  };
+  const currentData = useMemo(() => calculateYearData(selectedYear), [selectedYear, transactions, accounts]);
+  const previousData = useMemo(() => calculateYearData(selectedYear - 1), [selectedYear, transactions, accounts]);
 
-  // Calculate GuV Totals (Strictly for Selected Year)
-  const revenueTotal = getCategoryTotal('revenue', AccountType.REVENUE);
-  const otherRevenueTotal = getCategoryTotal('revenue_other', AccountType.REVENUE);
-  const materialTotal = getCategoryTotal('material', AccountType.EXPENSE);
-  const personnelTotal = getCategoryTotal('personnel', AccountType.EXPENSE);
-  const depreciationTotal = getCategoryTotal('depreciation', AccountType.EXPENSE);
-  const otherCostTotal = getCategoryTotal('other_cost', AccountType.EXPENSE);
-  const interestTotal = getCategoryTotal('interest', AccountType.EXPENSE);
-  const taxTotal = getCategoryTotal('taxes', AccountType.EXPENSE);
-
-  const totalIncome = revenueTotal + otherRevenueTotal;
-  const totalExpense = materialTotal + personnelTotal + depreciationTotal + otherCostTotal + interestTotal + taxTotal;
-  
-  // This calculates the Net Income for the SELECTED YEAR only
-  const netResult = totalIncome - totalExpense; 
-  
-  // Calculate Profit Carryforward from PREVIOUS years (Automatic)
-  const retainedEarnings = calculatePreviousYearsResult();
-
-  // --- VAT CALC ---
-  const getBalanceByPrefix = (prefix: string, type: AccountType) => {
-      const relevantAccounts = accounts.filter(a => a.code.startsWith(prefix));
-      return relevantAccounts.reduce((sum, acc) => sum + calculateReportBalance(acc.id, acc.type), 0);
-  };
-  const baseAmount19 = getBalanceByPrefix('84', AccountType.REVENUE);
-  const taxAmount19 = baseAmount19 * 0.19;
-  const baseAmount7 = getBalanceByPrefix('83', AccountType.REVENUE);
-  const taxAmount7 = baseAmount7 * 0.07;
-  const baseAmount0 = getBalanceByPrefix('81', AccountType.REVENUE);
-  const totalOutputTax = taxAmount19 + taxAmount7;
-  const inputTax = getBalanceByPrefix('15', AccountType.ASSET);
-  const vatPayable = totalOutputTax - inputTax;
-
-  // --- RENDER COMPONENT: REPORT ROW ---
   const ReportRow: React.FC<{ 
       label: string; 
-      amount?: number; 
+      amount: number; 
+      prevAmount: number;
       isTotal?: boolean; 
       level?: number; 
       details?: React.ReactNode 
-  }> = ({ label, amount, isTotal, level = 0, details }) => {
+  }> = ({ label, amount, prevAmount, isTotal, level = 0, details }) => {
       const [expanded, setExpanded] = useState(true);
       
-      const displayAmount = amount !== undefined ? amount : 0;
-      const color = displayAmount >= 0 ? (isTotal ? 'text-slate-900' : 'text-slate-700') : 'text-red-600';
-      const bgColor = isTotal ? (level === 0 ? 'bg-slate-100' : 'bg-slate-50') : '';
-      const paddingLeft = level * 16 + 12;
+      const isRoot = level === 0 && isTotal;
+      const isGroup = level === 1;
+      
+      const textColor = amount < 0 ? 'text-red-700' : 'text-slate-900';
+      const prevTextColor = prevAmount < 0 ? 'text-red-400' : 'text-slate-500';
+
+      const indentClass = level === 0 ? 'pl-2' : level === 1 ? 'pl-6' : 'pl-10';
+      
+      let containerClass = "grid grid-cols-12 items-center py-1 pr-2 transition-colors border-b border-transparent hover:bg-slate-50";
+      let labelClass = "col-span-6 flex items-center gap-2 truncate";
+      let numberClass = "col-span-3 text-right font-mono text-sm";
+      
+      if (isRoot) {
+          containerClass = "grid grid-cols-12 items-center py-2 pr-2 bg-slate-100/80 border-y border-slate-200 mt-2 mb-1 print:bg-slate-100 print:border-black";
+          labelClass += " font-bold text-slate-800 uppercase tracking-wide text-xs";
+          numberClass += " font-bold text-slate-900";
+      } else if (isGroup) {
+          labelClass += " font-semibold text-slate-700 text-sm";
+          numberClass += " font-medium text-slate-800";
+      } else {
+          labelClass += " text-slate-600 text-sm";
+      }
 
       return (
-          <div className="border-b border-slate-100 last:border-0">
+          <div className="last:border-0">
               <div 
-                className={`flex justify-between items-center py-2 pr-4 hover:bg-slate-50 transition-colors ${bgColor}`}
-                style={{ paddingLeft: `${paddingLeft}px` }}
+                className={containerClass}
                 onClick={() => setExpanded(!expanded)}
               >
-                  <div className={`flex items-center gap-2 ${isTotal ? 'font-bold' : ''}`}>
+                  <div className={`${labelClass} ${indentClass}`}>
                       {details && (
-                          <button className="text-slate-400 hover:text-slate-600">
+                          <button className="text-slate-400 hover:text-slate-600 print:hidden">
                               {expanded ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>}
                           </button>
                       )}
                       <span>{label}</span>
                   </div>
-                  {amount !== undefined && (
-                      <span className={`font-mono ${isTotal ? 'font-bold' : ''} ${color}`}>
-                          {displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} €
-                      </span>
-                  )}
+                  <div className={`${numberClass} ${textColor}`}>
+                      {amount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                  </div>
+                  <div className={`col-span-3 text-right font-mono text-xs ${prevTextColor}`}>
+                      {prevAmount !== 0 ? prevAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €' : '-'}
+                  </div>
               </div>
               {expanded && details && (
-                  <div className="animate-fadeIn">
+                  <div className="animate-fadeIn mb-2">
                       {details}
                   </div>
               )}
@@ -287,21 +289,40 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
       );
   };
 
-  // Helper to render account details for a category
   const renderAccountDetails = (categoryId: string, type: AccountType) => {
-      // Fix: Filter by Type as well to ensure correct list
       const relevantAccounts = accounts.filter(a => mapAccountToCategory(a) === categoryId && a.type === type);
       if (relevantAccounts.length === 0) return null;
+
+      const getAccBal = (accId: string) => {
+          const startDate = `${selectedYear}-01-01`;
+          const endDate = `${selectedYear}-12-31`;
+          let bal = 0;
+          transactions.forEach(t => {
+              if (t.date > endDate) return;
+              if ((type === AccountType.REVENUE || type === AccountType.EXPENSE) && t.date < startDate) return;
+              t.lines.forEach(l => {
+                  if (l.accountId === accId) {
+                      if ([AccountType.ASSET, AccountType.EXPENSE].includes(type)) bal += l.debit - l.credit;
+                      else bal += l.credit - l.debit;
+                  }
+              });
+          });
+          return bal;
+      }
 
       return (
           <div className="bg-white">
               {relevantAccounts.map(acc => {
-                  const bal = calculateReportBalance(acc.id, acc.type);
+                  const bal = getAccBal(acc.id);
                   if (Math.abs(bal) < 0.01) return null;
                   return (
-                      <div key={acc.id} className="flex justify-between py-1 pr-4 pl-12 text-xs text-slate-500 hover:bg-yellow-50">
-                          <span>{acc.code} - {acc.name}</span>
-                          <span className="font-mono">{bal.toLocaleString(undefined, { minimumFractionDigits: 2 })} €</span>
+                      <div key={acc.id} className="grid grid-cols-12 py-0.5 pr-2 hover:bg-yellow-50 text-[11px] text-slate-500">
+                          <div className="col-span-6 pl-12 truncate flex gap-2">
+                              <span className="font-mono text-slate-400">{acc.code}</span>
+                              <span>{acc.name}</span>
+                          </div>
+                          <div className="col-span-3 text-right font-mono">{bal.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</div>
+                          <div className="col-span-3"></div>
                       </div>
                   );
               })}
@@ -309,23 +330,33 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
       );
   };
 
-  // --- RECONCILIATION LOGIC ---
+  const getBalanceByPrefix = (prefix: string, type: AccountType) => {
+      const relevantAccounts = accounts.filter(a => a.code.startsWith(prefix));
+      const startDate = `${selectedYear}-01-01`; const endDate = `${selectedYear}-12-31`;
+      return relevantAccounts.reduce((sum, acc) => {
+          let bal = 0;
+          transactions.forEach(t => {
+              if (t.date > endDate) return;
+              if ((type === AccountType.REVENUE || type === AccountType.EXPENSE) && t.date < startDate) return;
+              t.lines.forEach(l => { if (l.accountId === acc.id) { if ([AccountType.ASSET, AccountType.EXPENSE].includes(type)) bal += l.debit - l.credit; else bal += l.credit - l.debit; } });
+          });
+          return sum + bal;
+      }, 0);
+  };
+  const baseAmount19 = getBalanceByPrefix('84', AccountType.REVENUE);
+  const baseAmount7 = getBalanceByPrefix('83', AccountType.REVENUE);
+  const inputTax = getBalanceByPrefix('15', AccountType.ASSET);
+  const vatPayable = (baseAmount19 * 0.19 + baseAmount7 * 0.07) - inputTax;
+
   const getReconciliationData = (taxAccountCode: string, taxRate: number) => {
       const taxAccount = accounts.find(a => a.code === taxAccountCode);
       if (!taxAccount) return [];
       const breakdown: any[] = [];
       transactions.forEach(t => {
-          if (t.date.substring(0, 4) !== selectedYear.toString()) return; // Filter by year
-
+          if (t.date.substring(0, 4) !== selectedYear.toString()) return;
           const taxLine = t.lines.find(l => l.accountId === taxAccount.id);
           if (!taxLine) return;
-          const baseLine = t.lines.find(l => 
-              l.accountId !== taxAccount.id && 
-              !['1000', '1200', '1400', '1600', '1210'].some(code => {
-                  const acc = accounts.find(a => a.id === l.accountId);
-                  return acc?.code.startsWith(code);
-              })
-          );
+          const baseLine = t.lines.find(l => l.accountId !== taxAccount.id && l.debit + l.credit > 0.01);
           if (baseLine) {
               const acc = accounts.find(a => a.id === baseLine.accountId);
               if (acc) {
@@ -340,7 +371,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
       return breakdown;
   };
 
-  // --- ELSTER FORM COMPONENTS ---
   const ElsterLine: React.FC<{ lineNr?: number; label: string; kz?: string; value?: number; isTaxField?: boolean; highlight?: boolean; }> = 
     ({ lineNr, label, kz, value, isTaxField = false, highlight = false }) => (
       <div className={`flex border-b border-slate-300 text-xs ${highlight ? 'bg-yellow-50' : ''}`}>
@@ -349,7 +379,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
           <div className="w-10 border-l border-r border-slate-300 bg-slate-200 p-1.5 text-center font-bold text-slate-900">{kz || ''}</div>
           <div className="w-32 p-1.5 text-right font-mono bg-white">
               {value !== undefined ? (isTaxField ? 
-                  <span className={value < 0 ? 'text-red-600' : 'text-slate-900'}>{value.toLocaleString('de-DE', { minimumFractionDigits: 2 })}</span> : 
+                  <span className={value < 0 ? 'text-red-600' : 'text-slate-900'}>{value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> : 
                   <span className="text-slate-900">{Math.floor(value).toLocaleString('de-DE')}</span>
               ) : <div className="w-full h-full bg-slate-100/30 diagonal-stripe"></div>}
           </div>
@@ -369,23 +399,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
       </div>
   );
 
-  // --- Buchhalternase (Visual Gap Filler) ---
-  // Renders a div that expands to fill space and shows a diagonal line
-  // REVISED: Remove min-height so it collapses to 0 if not needed.
   const LedgerFiller = () => (
-      <div 
-        className="flex-1 w-full relative border-x border-slate-100 min-h-0"
-      >
-         <div className="absolute inset-0" style={{
-             backgroundImage: `linear-gradient(to bottom right, transparent calc(50% - 1px), #cbd5e1 calc(50%), transparent calc(50% + 1px))`
-         }}></div>
+      <div className="flex-1 w-full relative border-x border-slate-200 min-h-[50px] bg-slate-50/10">
+         <div className="absolute inset-0" style={{backgroundImage: `linear-gradient(to bottom right, transparent calc(50% - 1px), #f1f5f9 calc(50%), transparent calc(50% + 1px))`}}></div>
       </div>
   );
 
+  const isBalanced = Math.abs(currentData.sumAktiva - currentData.sumPassiva) < 0.05;
+
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       
-      {/* --- REPORT CONTROLS (Year Selector) --- */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 no-print">
           <div className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-slate-500" />
@@ -414,8 +438,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
         {(activeReport === 'income' || activeReport === 'balance' || activeReport === 'reconciliation') && (
             <div className="text-center mb-8 print:mb-4">
                 <h2 className="text-2xl font-bold text-slate-900 uppercase tracking-wide">
-                    {activeReport === 'income' && 'Gewinn- und Verlustrechnung (GuV)'}
-                    {activeReport === 'balance' && 'Bilanz nach HGB'}
+                    {activeReport === 'income' && 'Gewinn- und Verlustrechnung (GuV) - SKR 03'}
+                    {activeReport === 'balance' && 'Bilanz nach HGB - SKR 03'}
                     {activeReport === 'reconciliation' && 'Abstimmung & Prüfung'}
                 </h2>
                 <p className="text-slate-400 text-sm mt-1">
@@ -425,72 +449,77 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                     }
                 </p>
                 <p className="text-lg font-bold mt-1">{companySettings.companyName}</p>
+                
+                {activeReport === 'balance' && !isBalanced && (
+                    <div className="mt-4 flex justify-center no-print">
+                        <div className="bg-red-100 text-red-700 px-4 py-2 rounded-full text-sm font-bold flex items-center shadow-sm">
+                            <AlertTriangle className="w-4 h-4 mr-2"/>
+                            Achtung: Bilanz ungleichgewichtig! (Diff: {(currentData.sumAktiva - currentData.sumPassiva).toFixed(2)} €)
+                        </div>
+                    </div>
+                )}
             </div>
         )}
 
-        {/* === GuV === */}
         {activeReport === 'income' && (
           <div className="space-y-1 font-sans text-sm animate-fadeIn">
+              <div className="grid grid-cols-12 text-xs font-bold text-slate-500 uppercase border-b-2 border-slate-800 pb-2 mb-2 px-2 print:px-0">
+                  <div className="col-span-6 pl-4">Position</div>
+                  <div className="col-span-3 text-right">Jahr {selectedYear}</div>
+                  <div className="col-span-3 text-right text-slate-400">Vorjahr {selectedYear - 1}</div>
+              </div>
               {GUV_STRUCTURE.map((item) => {
-                  let val = 0;
                   let type = AccountType.EXPENSE;
                   if (item.id.includes('revenue')) type = AccountType.REVENUE;
-                  
-                  val = getCategoryTotal(item.id, type);
                   
                   return (
                       <ReportRow 
                         key={item.id} 
                         label={item.label} 
-                        amount={val}
+                        amount={currentData.values[item.id]}
+                        prevAmount={previousData.values[item.id]}
                         details={renderAccountDetails(item.id, type)}
                       />
                   );
               })}
               
               <div className="mt-8 pt-4 border-t-2 border-slate-800">
-                  <div className="flex justify-between items-center text-lg font-bold">
-                      <span>Jahresüberschuss / Jahresfehlbetrag {selectedYear}</span>
-                      <span className={netResult >= 0 ? 'text-green-600' : 'text-red-600'}>
-                          {netResult.toLocaleString(undefined, { minimumFractionDigits: 2 })} €
-                      </span>
+                  <div className="grid grid-cols-12 items-center text-lg font-bold">
+                      <div className="col-span-6 pl-4 uppercase">Jahresüberschuss / Fehlbetrag</div>
+                      <div className={`col-span-3 text-right ${currentData.netResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {currentData.netResult.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                      </div>
+                      <div className={`col-span-3 text-right text-sm ${previousData.netResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {previousData.netResult.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                      </div>
                   </div>
               </div>
           </div>
         )}
 
-        {/* === BILANZ (FLEXBOX LAYOUT FOR EQUAL HEIGHT) === */}
         {activeReport === 'balance' && (
-          <div className="flex flex-col md:flex-row gap-8 animate-fadeIn items-stretch min-h-[600px]">
+          <div className="flex flex-col md:flex-row gap-0 animate-fadeIn items-stretch min-h-[600px] border border-slate-300 print:border-black overflow-x-auto">
               
-              {/* AKTIVA COLUMN */}
-              <div className="flex-1 flex flex-col h-full bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden">
-                  <div className="bg-slate-100 p-2 font-bold text-center border-b-2 border-slate-300 uppercase">Aktiva</div>
+              <div className="flex-1 flex flex-col h-full bg-white border-r border-slate-300 print:border-black min-w-[350px]">
+                  <div className="bg-slate-200 p-2 font-bold text-center border-b border-slate-300 uppercase tracking-widest text-slate-800 print:bg-white print:border-black">Aktiva</div>
                   
-                  {/* Content (will grow but stop for filler) */}
+                  <div className="grid grid-cols-12 text-[10px] font-bold text-slate-500 border-b border-slate-200 bg-slate-50 py-1 pr-2 print:border-black print:bg-white">
+                      <div className="col-span-6"></div>
+                      <div className="col-span-3 text-right text-slate-900">31.12.{selectedYear}</div>
+                      <div className="col-span-3 text-right text-slate-400">31.12.{selectedYear - 1}</div>
+                  </div>
+
                   <div className="flex-col">
                       {BILANZ_AKTIVA_STRUCTURE.map(group => {
-                          let amount = 0;
-                          
-                          // KORREKTUR DER BERECHNUNGSLOGIK:
-                          if (group.parent) {
-                              amount = getCategoryTotal(group.id, AccountType.ASSET);
-                          } else {
-                              const children = BILANZ_AKTIVA_STRUCTURE.filter(c => c.parent === group.id);
-                              if (children.length > 0) {
-                                  amount = children.reduce((sum, c) => sum + getCategoryTotal(c.id, AccountType.ASSET), 0);
-                              } else {
-                                  amount = getCategoryTotal(group.id, AccountType.ASSET);
-                              }
-                          }
-
-                          if (amount === 0 && group.parent) return null; 
-
+                          const val = currentData.values[group.id];
+                          const prevVal = previousData.values[group.id];
+                          if (val === 0 && prevVal === 0 && group.parent) return null; 
                           return (
                               <ReportRow 
                                 key={group.id} 
                                 label={group.label} 
-                                amount={amount} 
+                                amount={val}
+                                prevAmount={prevVal}
                                 isTotal={!group.parent}
                                 level={group.parent ? 1 : 0}
                                 details={group.parent || !BILANZ_AKTIVA_STRUCTURE.some(c => c.parent === group.id) ? renderAccountDetails(group.id, AccountType.ASSET) : undefined}
@@ -498,64 +527,40 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                           );
                       })}
                   </div>
-                  
-                  {/* BUCHHALTERNASE (FILLER) - Expands to fill remaining height. Min-h-0 ensures it collapses on full side. */}
                   <LedgerFiller />
-
-                  {/* TOTAL FOOTER (ALWAYS AT BOTTOM) */}
-                  <div className="pt-2 pb-2 px-4 border-t-4 border-double border-slate-800 flex justify-between font-bold text-lg bg-slate-50 mt-auto">
-                      <span>Summe Aktiva</span>
-                      <span>
-                          {BILANZ_AKTIVA_STRUCTURE.filter(g => !g.parent).reduce((sum, g) => {
-                              const children = BILANZ_AKTIVA_STRUCTURE.filter(c => c.parent === g.id);
-                              if (children.length > 0) {
-                                return sum + children.reduce((s, c) => s + getCategoryTotal(c.id, AccountType.ASSET), 0);
-                              } else {
-                                return sum + getCategoryTotal(g.id, AccountType.ASSET);
-                              }
-                          }, 0).toLocaleString(undefined, {minimumFractionDigits: 2})} €
-                      </span>
+                  <div className="grid grid-cols-12 py-2 px-2 border-t-4 border-double border-black bg-white mt-auto items-baseline">
+                      <div className="col-span-6"></div>
+                      <div className="col-span-3 text-right font-bold text-slate-900">
+                        {currentData.sumAktiva.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €
+                      </div>
+                      <div className="col-span-3 text-right font-bold text-slate-500 text-xs">
+                        {previousData.sumAktiva.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €
+                      </div>
                   </div>
               </div>
 
-              {/* PASSIVA COLUMN */}
-              <div className="flex-1 flex flex-col h-full bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden">
-                  <div className="bg-slate-100 p-2 font-bold text-center border-b-2 border-slate-300 uppercase">Passiva</div>
+              <div className="flex-1 flex flex-col h-full bg-white min-w-[350px]">
+                  <div className="bg-slate-200 p-2 font-bold text-center border-b border-slate-300 uppercase tracking-widest text-slate-800 print:bg-white print:border-black">Passiva</div>
                   
-                  {/* Content */}
+                  <div className="grid grid-cols-12 text-[10px] font-bold text-slate-500 border-b border-slate-200 bg-slate-50 py-1 pr-2 print:border-black print:bg-white">
+                      <div className="col-span-6"></div>
+                      <div className="col-span-3 text-right text-slate-900">31.12.{selectedYear}</div>
+                      <div className="col-span-3 text-right text-slate-400">31.12.{selectedYear - 1}</div>
+                  </div>
+
                   <div className="flex-col">
                       {BILANZ_PASSIVA_STRUCTURE.map(group => {
-                          let amount = 0;
                           let showDetails = true;
-
-                          if (group.id === 'pas_A_III') {
-                              amount = netResult; 
-                              showDetails = false;
-                          } else if (group.id === 'pas_A_II') {
-                              const manualBookings = getCategoryTotal(group.id, AccountType.EQUITY);
-                              amount = manualBookings + retainedEarnings;
-                          } else if (group.parent) {
-                              amount = getCategoryTotal(group.id, group.id.startsWith('pas_A') ? AccountType.EQUITY : AccountType.LIABILITY);
-                          } else {
-                              const children = BILANZ_PASSIVA_STRUCTURE.filter(c => c.parent === group.id);
-                              if (children.length > 0) {
-                                  amount = children.reduce((sum, c) => {
-                                      if (c.id === 'pas_A_III') return sum + netResult;
-                                      if (c.id === 'pas_A_II') return sum + getCategoryTotal(c.id, AccountType.EQUITY) + retainedEarnings;
-                                      return sum + getCategoryTotal(c.id, c.id.startsWith('pas_A') ? AccountType.EQUITY : AccountType.LIABILITY);
-                                  }, 0);
-                              } else {
-                                  amount = getCategoryTotal(group.id, group.id.startsWith('pas_A') ? AccountType.EQUITY : AccountType.LIABILITY);
-                              }
-                          }
-
-                          if (amount === 0 && group.parent && group.id !== 'pas_A_III' && group.id !== 'pas_A_II') return null;
-
+                          if (group.id === 'pas_A_III') showDetails = false;
+                          const val = currentData.values[group.id];
+                          const prevVal = previousData.values[group.id];
+                          if (val === 0 && prevVal === 0 && group.parent && group.id !== 'pas_A_III' && group.id !== 'pas_A_II') return null;
                           return (
                               <ReportRow 
                                 key={group.id} 
                                 label={group.label} 
-                                amount={amount} 
+                                amount={val}
+                                prevAmount={prevVal}
                                 isTotal={!group.parent}
                                 level={group.parent ? 1 : 0}
                                 details={showDetails && (group.parent || !BILANZ_PASSIVA_STRUCTURE.some(c => c.parent === group.id)) ? renderAccountDetails(group.id, group.id.startsWith('pas_A') ? AccountType.EQUITY : AccountType.LIABILITY) : undefined}
@@ -563,27 +568,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                           );
                       })}
                   </div>
-
-                  {/* BUCHHALTERNASE (FILLER) - Expands to fill remaining height */}
                   <LedgerFiller />
-
-                  {/* TOTAL FOOTER (ALWAYS AT BOTTOM) */}
-                   <div className="pt-2 pb-2 px-4 border-t-4 border-double border-slate-800 flex justify-between font-bold text-lg bg-slate-50 mt-auto">
-                      <span>Summe Passiva</span>
-                      <span>
-                          {BILANZ_PASSIVA_STRUCTURE.filter(g => !g.parent).reduce((sum, g) => {
-                              const children = BILANZ_PASSIVA_STRUCTURE.filter(c => c.parent === g.id);
-                              if (children.length > 0) {
-                                  return sum + children.reduce((s, c) => {
-                                      if (c.id === 'pas_A_III') return s + netResult;
-                                      if (c.id === 'pas_A_II') return s + getCategoryTotal(c.id, AccountType.EQUITY) + retainedEarnings;
-                                      return s + getCategoryTotal(c.id, c.id.startsWith('pas_A') ? AccountType.EQUITY : AccountType.LIABILITY);
-                                  }, 0);
-                              } else {
-                                  return sum + getCategoryTotal(g.id, g.id.startsWith('pas_A') ? AccountType.EQUITY : AccountType.LIABILITY);
-                              }
-                          }, 0).toLocaleString(undefined, {minimumFractionDigits: 2})} €
-                      </span>
+                   <div className="grid grid-cols-12 py-2 px-2 border-t-4 border-double border-black bg-white mt-auto items-baseline">
+                      <div className="col-span-6"></div>
+                      <div className="col-span-3 text-right font-bold text-slate-900">
+                        {currentData.sumPassiva.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €
+                      </div>
+                      <div className="col-span-3 text-right font-bold text-slate-500 text-xs">
+                        {previousData.sumPassiva.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €
+                      </div>
                   </div>
               </div>
           </div>
@@ -591,26 +584,29 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
 
         {/* === VAT / UStVA === */}
         {activeReport === 'vat' && (
-           <div className="animate-fadeIn flex flex-col items-center gap-8 bg-slate-100/50 p-8 print:p-0 print:bg-white print:block">
+           <div className="animate-fadeIn flex flex-col items-center gap-8 bg-slate-100/50 p-4 md:p-8 print:p-0 print:bg-white print:block">
                 <div className="w-full max-w-[210mm] flex justify-between items-center mb-4 no-print">
-                    <div className="flex items-center gap-2 text-slate-600"><FileText className="w-4 h-4" /><span className="text-sm font-medium">Offizielles Layout</span></div>
+                    <div className="flex items-center gap-2 text-slate-600"><FileText className="w-4 h-4" /><span className="text-sm font-medium">Offizielles Layout (Scrollbar)</span></div>
                     <button onClick={() => window.print()} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm"><Printer className="w-4 h-4"/> Drucken</button>
                 </div>
-                <div className="w-[210mm] min-h-[297mm] bg-white shadow-lg p-[15mm] text-slate-900 relative print:shadow-none print:w-full print:h-auto print:m-0">
-                    <FormHeader page={1} title="Steuerpflichtige Umsätze" />
-                    <div className="grid grid-cols-2 gap-4 mb-6 text-sm border border-slate-300 p-2 bg-slate-50">
-                        <div><div className="text-[10px] uppercase text-slate-500 font-bold">Steuernummer</div><div className="font-mono text-lg tracking-widest">{companySettings.taxNumber || '_________________'}</div></div>
-                        <div><div className="text-[10px] uppercase text-slate-500 font-bold">Zeitraum</div><div className="font-bold">Jahr {selectedYear}</div></div>
+                {/* FIX: Horizontal Scroll Container added */}
+                <div className="w-full overflow-x-auto pb-8 flex justify-start lg:justify-center">
+                    <div className="w-[210mm] min-h-[297mm] bg-white shadow-lg p-[15mm] text-slate-900 relative print:shadow-none print:w-full print:h-auto print:m-0 shrink-0">
+                        <FormHeader page={1} title="Steuerpflichtige Umsätze" />
+                        <div className="grid grid-cols-2 gap-4 mb-6 text-sm border border-slate-300 p-2 bg-slate-50">
+                            <div><div className="text-[10px] uppercase text-slate-500 font-bold">Steuernummer</div><div className="font-mono text-lg tracking-widest">{companySettings.taxNumber || '_________________'}</div></div>
+                            <div><div className="text-[10px] uppercase text-slate-500 font-bold">Zeitraum</div><div className="font-bold">Jahr {selectedYear}</div></div>
+                        </div>
+                        <div className="bg-slate-200 px-2 py-1 font-bold text-slate-800 text-xs uppercase border-y border-slate-300 mt-4 mb-0">1. Steuerpflichtige Umsätze</div>
+                        <ElsterLine lineNr={20} label="Lieferungen und sonstige Leistungen zu 19 %" kz="81" value={baseAmount19} />
+                        <ElsterLine lineNr={21} label="Lieferungen und sonstige Leistungen zu 7 %" kz="86" value={baseAmount7} />
+                        
+                        <div className="bg-slate-200 px-2 py-1 font-bold text-slate-800 text-xs uppercase border-y border-slate-300 mt-4 mb-0">5. Abziehbare Vorsteuer</div>
+                        <ElsterLine lineNr={50} label="Vorsteuer aus Rechnungen von anderen Unternehmern" kz="66" value={inputTax} isTaxField highlight />
+                        
+                        <div className="bg-slate-200 px-2 py-1 font-bold text-slate-800 text-xs uppercase border-y border-slate-300 mt-4 mb-0">6. Berechnung</div>
+                        <ElsterLine lineNr={60} label="Verbleibende Umsatzsteuer-Vorauszahlung / Überschuss" kz="83" value={vatPayable} isTaxField highlight />
                     </div>
-                    <div className="bg-slate-200 px-2 py-1 font-bold text-slate-800 text-xs uppercase border-y border-slate-300 mt-4 mb-0">1. Steuerpflichtige Umsätze</div>
-                    <ElsterLine lineNr={20} label="Lieferungen und sonstige Leistungen zu 19 %" kz="81" value={baseAmount19} />
-                    <ElsterLine lineNr={21} label="Lieferungen und sonstige Leistungen zu 7 %" kz="86" value={baseAmount7} />
-                    
-                    <div className="bg-slate-200 px-2 py-1 font-bold text-slate-800 text-xs uppercase border-y border-slate-300 mt-4 mb-0">5. Abziehbare Vorsteuer</div>
-                    <ElsterLine lineNr={50} label="Vorsteuer aus Rechnungen von anderen Unternehmern" kz="66" value={inputTax} isTaxField highlight />
-                    
-                    <div className="bg-slate-200 px-2 py-1 font-bold text-slate-800 text-xs uppercase border-y border-slate-300 mt-4 mb-0">6. Berechnung</div>
-                    <ElsterLine lineNr={60} label="Verbleibende Umsatzsteuer-Vorauszahlung / Überschuss" kz="83" value={vatPayable} isTaxField highlight />
                 </div>
            </div>
         )}
@@ -625,7 +621,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                     </div>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {[ {code:'1576', rate:19}, {code:'1571', rate:7} ].map(conf => (
+                    {[ {code:'1576000', rate:19}, {code:'1571000', rate:7} ].map(conf => (
                         <div key={conf.code} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                             <div className="bg-slate-50 p-4 border-b border-slate-200 font-bold text-slate-700">Vorsteuer {conf.rate}% ({conf.code})</div>
                             <table className="w-full text-sm">
@@ -636,8 +632,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                                     {getReconciliationData(conf.code, conf.rate).map((row, i) => (
                                         <tr key={i} className="hover:bg-slate-50 border-b border-slate-100">
                                             <td className="p-3">{row.accountName}</td>
-                                            <td className="p-3 text-right font-mono">{row.netAmount.toFixed(2)}</td>
-                                            <td className="p-3 text-right font-bold">{row.taxAmount.toFixed(2)}</td>
+                                            <td className="p-3 text-right font-mono">{row.netAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                            <td className="p-3 text-right font-bold">{row.taxAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                         </tr>
                                     ))}
                                 </tbody>
