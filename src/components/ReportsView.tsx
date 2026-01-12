@@ -79,7 +79,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
 
   // --- ENGINE: Map Accounts to Categories based on SKR03 Code Ranges ---
   const mapAccountToCategory = (account: Account): string => {
-      // FIX: Parse only first 4 digits to handle 7-digit DATEV codes (e.g. 1400000 -> 1400)
       const c = parseInt(account.code.substring(0, 4));
       
       // --- GuV (P&L) Mapping ---
@@ -100,56 +99,49 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
           return 'other_cost';
       }
 
-      // --- BILANZ AKTIVA Mapping (SKR 03: 0xxx, 1xxx) ---
+      // --- BILANZ AKTIVA Mapping ---
       if (account.type === AccountType.ASSET) {
-          // Anlagevermögen (Class 0)
-          if (c >= 10 && c <= 49) return 'act_A_I'; // Immateriell
-          if (c >= 50 && c <= 499) return 'act_A_II'; // Sachanlagen
-          if (c >= 500 && c <= 699) return 'act_A_III'; // Finanzanlagen
+          if (c >= 10 && c <= 49) return 'act_A_I'; 
+          if (c >= 50 && c <= 499) return 'act_A_II'; 
+          if (c >= 500 && c <= 699) return 'act_A_III'; 
           
-          // Umlaufvermögen (Class 1)
-          if (c >= 3960 && c <= 3980) return 'act_B_I'; // Bestände
-          if (c >= 1400 && c <= 1499) return 'act_B_II'; // Forderungen aLL
-          if (c >= 1500 && c <= 1549) return 'act_B_II'; // Sonstige Forderungen
-          if (c >= 1000 && c <= 1399) return 'act_B_III'; // Bank/Kasse
+          if (c >= 3960 && c <= 3980) return 'act_B_I'; 
+          if (c >= 1400 && c <= 1499) return 'act_B_II'; 
+          if (c >= 1500 && c <= 1549) return 'act_B_II'; 
+          if (c >= 1000 && c <= 1399) return 'act_B_III'; 
           
           if (c >= 1570 && c <= 1599) return 'act_B_II'; 
-          
-          if (c >= 980 && c <= 990) return 'act_C'; // RAP
+          if (c >= 980 && c <= 990) return 'act_C'; 
           
           return 'act_B_II'; 
       }
 
-      // --- BILANZ PASSIVA Mapping (SKR 03: 0xxx, 1xxx) ---
+      // --- BILANZ PASSIVA Mapping ---
       if (account.type === AccountType.LIABILITY) {
-          // SKR 03 Rückstellungen sind meist in 09xx
           if (c >= 950 && c <= 979) return 'pas_B'; 
-          if (c >= 2300 && c <= 2399) return 'pas_B'; // Falls sonstige Rückstellungen dort gebucht
+          if (c >= 2300 && c <= 2399) return 'pas_B'; 
           
-          // Verbindlichkeiten (Class 1)
-          if (c >= 1600 && c <= 1699) return 'pas_C_I'; // Verb. aLL
-          if (c >= 1705 && c <= 1709) return 'pas_C_II'; // Bankdarlehen
-          if (c >= 1700 && c <= 1999) return 'pas_C_III'; // Sonstige (USt, Lohn etc.)
+          if (c >= 1600 && c <= 1699) return 'pas_C_I'; 
+          if (c >= 1705 && c <= 1709) return 'pas_C_II'; 
+          if (c >= 1700 && c <= 1999) return 'pas_C_III'; 
           
           return 'pas_C_III';
       }
 
       if (account.type === AccountType.EQUITY) {
-          if (c >= 1800 && c <= 1899) return 'pas_A_IV'; // Privat
-          if (c >= 800 && c <= 899) return 'pas_A_I'; // Festkapital
-          if (c >= 900 && c <= 949) return 'pas_A_II'; // Vortrag
+          if (c >= 1800 && c <= 1899) return 'pas_A_IV'; 
+          if (c >= 800 && c <= 899) return 'pas_A_I'; 
+          if (c >= 900 && c <= 949) return 'pas_A_II'; 
           return 'pas_A_I';
       }
 
       return 'uncategorized';
   };
 
-  // --- CORE ENGINE: Calculates all values for a specific year ---
   const calculateYearData = (targetYear: number) => {
       const startDate = `${targetYear}-01-01`;
       const endDate = `${targetYear}-12-31`;
 
-      // 1. Helper to calculate a single account's balance in this timeframe
       const getAccountBalance = (acc: Account) => {
           let bal = 0;
           transactions.forEach(t => {
@@ -166,14 +158,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
           return bal;
       };
 
-      // 2. Helper for Category Totals
       const getCatTotal = (catId: string, type: AccountType) => {
           return accounts
             .filter(a => mapAccountToCategory(a) === catId && a.type === type)
             .reduce((sum, a) => sum + getAccountBalance(a), 0);
       };
 
-      // 3. Calculate GuV
       const revenue = getCatTotal('revenue', AccountType.REVENUE);
       const otherRevenue = getCatTotal('revenue_other', AccountType.REVENUE);
       const material = getCatTotal('material', AccountType.EXPENSE);
@@ -187,7 +177,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
       const totalExpense = material + personnel + depreciation + otherCost + interest + taxes;
       const netResult = totalIncome - totalExpense;
 
-      // 4. Calculate Retained Earnings (Profit Carryforward from Years PRIOR to targetYear)
       let retainedEarnings = 0;
       transactions.forEach(t => {
           if (t.date < startDate) {
@@ -199,14 +188,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
           }
       });
 
-      // 5. Build Result Map
       const values: Record<string, number> = {
-          // GuV
           revenue, revenue_other: otherRevenue, material, personnel, depreciation, other_cost: otherCost, interest, taxes,
           netResult, retainedEarnings
       };
 
-      // Bilanz
       [...BILANZ_AKTIVA_STRUCTURE, ...BILANZ_PASSIVA_STRUCTURE].forEach(group => {
           if (group.id === 'pas_A_III') {
               values[group.id] = netResult;
@@ -218,7 +204,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
           }
       });
 
-      // Calculate Tree Totals (Parent Groups)
       const processTreeTotals = (structure: ReportGroup[]) => {
           structure.filter(g => g.isTotal).forEach(parent => {
               const children = structure.filter(c => c.parent === parent.id);
@@ -235,18 +220,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
       processTreeTotals(BILANZ_AKTIVA_STRUCTURE);
       processTreeTotals(BILANZ_PASSIVA_STRUCTURE);
 
-      // Final Balance Sums
       const sumAktiva = BILANZ_AKTIVA_STRUCTURE.filter(g => !g.parent).reduce((s, g) => s + values[g.id], 0);
       const sumPassiva = BILANZ_PASSIVA_STRUCTURE.filter(g => !g.parent).reduce((s, g) => s + values[g.id], 0);
 
       return { values, sumAktiva, sumPassiva, netResult };
   };
 
-  // --- MEMOIZED DATA FOR CURRENT & PREVIOUS YEAR ---
   const currentData = useMemo(() => calculateYearData(selectedYear), [selectedYear, transactions, accounts]);
   const previousData = useMemo(() => calculateYearData(selectedYear - 1), [selectedYear, transactions, accounts]);
 
-  // --- COMPONENT: REPORT ROW WITH PREVIOUS YEAR (IMPROVED DESIGN) ---
   const ReportRow: React.FC<{ 
       label: string; 
       amount: number; 
@@ -286,7 +268,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                 className={containerClass}
                 onClick={() => setExpanded(!expanded)}
               >
-                  {/* Label Column */}
                   <div className={`${labelClass} ${indentClass}`}>
                       {details && (
                           <button className="text-slate-400 hover:text-slate-600 print:hidden">
@@ -296,12 +277,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                       <span>{label}</span>
                   </div>
                   
-                  {/* Current Year Column - STRICT DE-DE 2 DECIMALS */}
                   <div className={`${numberClass} ${textColor}`}>
                       {amount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                   </div>
 
-                  {/* Previous Year Column */}
                   <div className={`col-span-3 text-right font-mono text-xs ${prevTextColor}`}>
                       {prevAmount !== 0 ? prevAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €' : '-'}
                   </div>
@@ -356,7 +335,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
       );
   };
 
-  // VAT & Reconciliation helpers
   const getBalanceByPrefix = (prefix: string, type: AccountType) => {
       const relevantAccounts = accounts.filter(a => a.code.startsWith(prefix));
       const startDate = `${selectedYear}-01-01`; const endDate = `${selectedYear}-12-31`;
@@ -383,7 +361,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
           if (t.date.substring(0, 4) !== selectedYear.toString()) return;
           const taxLine = t.lines.find(l => l.accountId === taxAccount.id);
           if (!taxLine) return;
-          // Simple heuristic to find base amount line
           const baseLine = t.lines.find(l => l.accountId !== taxAccount.id && l.debit + l.credit > 0.01);
           if (baseLine) {
               const acc = accounts.find(a => a.id === baseLine.accountId);
@@ -433,11 +410,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
       </div>
   );
 
-  // Is Balanced Check for visual alert
   const isBalanced = Math.abs(currentData.sumAktiva - currentData.sumPassiva) < 0.05;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 no-print">
           <div className="flex items-center gap-2">
@@ -490,7 +466,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
             </div>
         )}
 
-        {/* --- REPORT HEADER ROW (INCOME ONLY) --- */}
         {(activeReport === 'income') && (
             <div className="grid grid-cols-12 text-xs font-bold text-slate-500 uppercase border-b-2 border-slate-800 pb-2 mb-2 px-2 print:px-0">
                 <div className="col-span-6 pl-4"></div>
@@ -533,13 +508,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
 
         {/* === BILANZ === */}
         {activeReport === 'balance' && (
-          <div className="flex flex-col md:flex-row gap-0 animate-fadeIn items-stretch min-h-[600px] border border-slate-300 print:border-black">
+          <div className="flex flex-col md:flex-row gap-0 animate-fadeIn items-stretch min-h-[600px] border border-slate-300 print:border-black overflow-x-auto">
               
-              {/* AKTIVA COLUMN */}
-              <div className="flex-1 flex flex-col h-full bg-white border-r border-slate-300 print:border-black">
+              <div className="flex-1 min-w-[350px] flex flex-col h-full bg-white border-r border-slate-300 print:border-black">
                   <div className="bg-slate-200 p-2 font-bold text-center border-b border-slate-300 uppercase tracking-widest text-slate-800 print:bg-white print:border-black">Aktiva</div>
                   
-                  {/* HEADER AKTIVA */}
                   <div className="grid grid-cols-12 text-[10px] font-bold text-slate-500 border-b border-slate-200 bg-slate-50 py-1 pr-2 print:border-black print:bg-white">
                       <div className="col-span-6"></div>
                       <div className="col-span-3 text-right text-slate-900">31.12.{selectedYear}</div>
@@ -550,9 +523,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                       {BILANZ_AKTIVA_STRUCTURE.map(group => {
                           const val = currentData.values[group.id];
                           const prevVal = previousData.values[group.id];
-
                           if (val === 0 && prevVal === 0 && group.parent) return null; 
-
                           return (
                               <ReportRow 
                                 key={group.id} 
@@ -566,9 +537,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                           );
                       })}
                   </div>
-                  
                   <LedgerFiller />
-
                   <div className="grid grid-cols-12 py-2 px-2 border-t-4 border-double border-black bg-white mt-auto items-baseline">
                       <div className="col-span-6"></div>
                       <div className="col-span-3 text-right font-bold text-slate-900">
@@ -580,11 +549,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                   </div>
               </div>
 
-              {/* PASSIVA COLUMN */}
-              <div className="flex-1 flex flex-col h-full bg-white">
+              <div className="flex-1 min-w-[350px] flex flex-col h-full bg-white">
                   <div className="bg-slate-200 p-2 font-bold text-center border-b border-slate-300 uppercase tracking-widest text-slate-800 print:bg-white print:border-black">Passiva</div>
                   
-                  {/* HEADER PASSIVA */}
                   <div className="grid grid-cols-12 text-[10px] font-bold text-slate-500 border-b border-slate-200 bg-slate-50 py-1 pr-2 print:border-black print:bg-white">
                       <div className="col-span-6"></div>
                       <div className="col-span-3 text-right text-slate-900">31.12.{selectedYear}</div>
@@ -595,12 +562,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                       {BILANZ_PASSIVA_STRUCTURE.map(group => {
                           let showDetails = true;
                           if (group.id === 'pas_A_III') showDetails = false;
-
                           const val = currentData.values[group.id];
                           const prevVal = previousData.values[group.id];
-
                           if (val === 0 && prevVal === 0 && group.parent && group.id !== 'pas_A_III' && group.id !== 'pas_A_II') return null;
-
                           return (
                               <ReportRow 
                                 key={group.id} 
@@ -614,9 +578,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
                           );
                       })}
                   </div>
-
                   <LedgerFiller />
-
                    <div className="grid grid-cols-12 py-2 px-2 border-t-4 border-double border-black bg-white mt-auto items-baseline">
                       <div className="col-span-6"></div>
                       <div className="col-span-3 text-right font-bold text-slate-900">
@@ -630,28 +592,32 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ transactions, accounts
           </div>
         )}
 
-        {/* === VAT / UStVA === */}
+        {/* === VAT / UStVA (FIXED LAYOUT SCROLLING) === */}
         {activeReport === 'vat' && (
-           <div className="animate-fadeIn flex flex-col items-center gap-8 bg-slate-100/50 p-8 print:p-0 print:bg-white print:block">
+           <div className="animate-fadeIn flex flex-col items-center gap-8 bg-slate-100/50 p-4 md:p-8 print:p-0 print:bg-white print:block">
                 <div className="w-full max-w-[210mm] flex justify-between items-center mb-4 no-print">
-                    <div className="flex items-center gap-2 text-slate-600"><FileText className="w-4 h-4" /><span className="text-sm font-medium">Offizielles Layout</span></div>
-                    <button onClick={() => window.print()} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm"><Printer className="w-4 h-4"/> Drucken</button>
+                    <div className="flex items-center gap-2 text-slate-600"><FileText className="w-4 h-4" /><span className="text-sm font-medium">Offizielles Layout (A4)</span></div>
+                    <button onClick={() => window.print()} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm transition-all"><Printer className="w-4 h-4"/> Drucken</button>
                 </div>
-                <div className="w-[210mm] min-h-[297mm] bg-white shadow-lg p-[15mm] text-slate-900 relative print:shadow-none print:w-full print:h-auto print:m-0">
-                    <FormHeader page={1} title="Steuerpflichtige Umsätze" />
-                    <div className="grid grid-cols-2 gap-4 mb-6 text-sm border border-slate-300 p-2 bg-slate-50">
-                        <div><div className="text-[10px] uppercase text-slate-500 font-bold">Steuernummer</div><div className="font-mono text-lg tracking-widest">{companySettings.taxNumber || '_________________'}</div></div>
-                        <div><div className="text-[10px] uppercase text-slate-500 font-bold">Zeitraum</div><div className="font-bold">Jahr {selectedYear}</div></div>
+                
+                {/* Horizontal Scroll Wrapper for smaller screens */}
+                <div className="w-full overflow-x-auto pb-6 print:overflow-visible">
+                    <div className="w-[210mm] min-h-[297mm] bg-white shadow-xl p-[15mm] text-slate-900 relative print:shadow-none print:w-full print:h-auto print:m-0 mx-auto border border-slate-200 print:border-none">
+                        <FormHeader page={1} title="Steuerpflichtige Umsätze" />
+                        <div className="grid grid-cols-2 gap-4 mb-6 text-sm border border-slate-300 p-2 bg-slate-50">
+                            <div><div className="text-[10px] uppercase text-slate-500 font-bold">Steuernummer</div><div className="font-mono text-lg tracking-widest">{companySettings.taxNumber || '_________________'}</div></div>
+                            <div><div className="text-[10px] uppercase text-slate-500 font-bold">Zeitraum</div><div className="font-bold">Jahr {selectedYear}</div></div>
+                        </div>
+                        <div className="bg-slate-200 px-2 py-1 font-bold text-slate-800 text-xs uppercase border-y border-slate-300 mt-4 mb-0">1. Steuerpflichtige Umsätze</div>
+                        <ElsterLine lineNr={20} label="Lieferungen und sonstige Leistungen zu 19 %" kz="81" value={baseAmount19} />
+                        <ElsterLine lineNr={21} label="Lieferungen und sonstige Leistungen zu 7 %" kz="86" value={baseAmount7} />
+                        
+                        <div className="bg-slate-200 px-2 py-1 font-bold text-slate-800 text-xs uppercase border-y border-slate-300 mt-4 mb-0">5. Abziehbare Vorsteuer</div>
+                        <ElsterLine lineNr={50} label="Vorsteuer aus Rechnungen von anderen Unternehmern" kz="66" value={inputTax} isTaxField highlight />
+                        
+                        <div className="bg-slate-200 px-2 py-1 font-bold text-slate-800 text-xs uppercase border-y border-slate-300 mt-4 mb-0">6. Berechnung</div>
+                        <ElsterLine lineNr={60} label="Verbleibende Umsatzsteuer-Vorauszahlung / Überschuss" kz="83" value={vatPayable} isTaxField highlight />
                     </div>
-                    <div className="bg-slate-200 px-2 py-1 font-bold text-slate-800 text-xs uppercase border-y border-slate-300 mt-4 mb-0">1. Steuerpflichtige Umsätze</div>
-                    <ElsterLine lineNr={20} label="Lieferungen und sonstige Leistungen zu 19 %" kz="81" value={baseAmount19} />
-                    <ElsterLine lineNr={21} label="Lieferungen und sonstige Leistungen zu 7 %" kz="86" value={baseAmount7} />
-                    
-                    <div className="bg-slate-200 px-2 py-1 font-bold text-slate-800 text-xs uppercase border-y border-slate-300 mt-4 mb-0">5. Abziehbare Vorsteuer</div>
-                    <ElsterLine lineNr={50} label="Vorsteuer aus Rechnungen von anderen Unternehmern" kz="66" value={inputTax} isTaxField highlight />
-                    
-                    <div className="bg-slate-200 px-2 py-1 font-bold text-slate-800 text-xs uppercase border-y border-slate-300 mt-4 mb-0">6. Berechnung</div>
-                    <ElsterLine lineNr={60} label="Verbleibende Umsatzsteuer-Vorauszahlung / Überschuss" kz="83" value={vatPayable} isTaxField highlight />
                 </div>
            </div>
         )}
