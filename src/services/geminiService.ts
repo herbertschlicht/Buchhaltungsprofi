@@ -43,8 +43,9 @@ export const generateFinancialInsight = async (
   `;
 
   try {
+    // Using gemini-3-flash-preview as per guidelines for basic text tasks
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: prompt,
     });
     return response.text || "Konnte keine Einsicht generieren.";
@@ -59,8 +60,9 @@ export const suggestTransactionCategory = async (description: string): Promise<s
     if (!ai) return null;
 
     try {
+        // Using gemini-3-flash-preview as per guidelines
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: `Gegeben ist die Transaktionsbeschreibung "${description}", schlagen Sie die wahrscheinlichste Buchungskategorie vor (z.B. Bürobedarf, Reisekosten, Umsatz, Nebenkosten, Beratungsleistungen). Antworten Sie NUR mit dem Kategorienamen auf Deutsch.`,
         });
         return response.text?.trim() || null;
@@ -91,7 +93,8 @@ export const  initializeCoachChat = () => {
     `;
 
     chatSession = ai.chats.create({
-        model: "gemini-2.5-flash",
+        // Using gemini-3-flash-preview as per guidelines for complex text tasks
+        model: "gemini-3-flash-preview",
         config: {
             systemInstruction: systemInstruction,
             temperature: 0.7,
@@ -101,13 +104,15 @@ export const  initializeCoachChat = () => {
     return chatSession;
 };
 
-export const sendMessageToCoach = async (message: string): Promise<{ text: string, imagePrompt?: string }> => {
+export const sendMessageToCoach = async (message: string): Promise<{ text: string, imagePrompt?: string, totalTokens: number }> => {
     if (!chatSession) initializeCoachChat();
-    if (!chatSession) return { text: "Fehler: KI nicht initialisiert." };
+    if (!chatSession) return { text: "Fehler: KI nicht initialisiert.", totalTokens: 0 };
 
     try {
         const result = await chatSession.sendMessage({ message });
         let text = result.text || "";
+        // Extract token usage metadata for the UI
+        const totalTokens = result.usageMetadata?.totalTokenCount || 0;
         
         // Check for Image Tag
         let imagePrompt = undefined;
@@ -119,10 +124,10 @@ export const sendMessageToCoach = async (message: string): Promise<{ text: strin
             text = text.replace(match[0], '').trim(); // Remove tag from display text
         }
 
-        return { text, imagePrompt };
+        return { text, imagePrompt, totalTokens };
     } catch (error) {
         console.error("Chat Error:", error);
-        return { text: "Entschuldigung, ich habe gerade Verbindungsprobleme. Versuche es gleich nochmal! 🤯" };
+        return { text: "Entschuldigung, ich habe gerade Verbindungsprobleme. Versuche es gleich nochmal! 🤯", totalTokens: 0 };
     }
 };
 
@@ -131,21 +136,24 @@ export const generateCoachImage = async (prompt: string): Promise<string | null>
     if (!ai) return null;
 
     try {
-        const response = await ai.models.generateImages({
-            model: 'imagen-3.0-generate-001',
-            prompt: `A friendly, clean, educational illustration style: ${prompt}`,
-            config: {
-                numberOfImages: 1,
-                aspectRatio: '4:3', 
-                outputMimeType: 'image/jpeg'
-            }
+        // Updated to use the preferred gemini-2.5-flash-image model with generateContent for images
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: {
+              parts: [
+                {
+                  text: `A friendly, clean, educational illustration style: ${prompt}`,
+                },
+              ],
+            },
         });
 
-        // Safely access optional properties to prevent build errors
-        const imageBytes = response.generatedImages?.[0]?.image?.imageBytes;
-        
-        if (imageBytes) {
-            return `data:image/jpeg;base64,${imageBytes}`;
+        // Iterate through response parts to find the inline image data
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+                const base64EncodeString: string = part.inlineData.data;
+                return `data:image/png;base64,${base64EncodeString}`;
+            }
         }
         return null;
     } catch (error) {

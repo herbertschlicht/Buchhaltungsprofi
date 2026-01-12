@@ -1,4 +1,5 @@
 
+
 export enum AccountType {
   ASSET = 'ASSET',
   LIABILITY = 'LIABILITY',
@@ -12,19 +13,25 @@ export enum ContactType {
   VENDOR = 'VENDOR'      // Creditor
 }
 
-// NEW: Transaction Types for better categorization
 export enum TransactionType {
-  STANDARD = 'STANDARD',   // Normale Rechnung / Zahlung
-  // Added missing types
+  STANDARD = 'STANDARD',
   OPENING_BALANCE = 'OPENING_BALANCE',
-  PAYROLL = 'PAYROLL',     // Lohn & Gehalt
-  CLOSING = 'CLOSING',     // Jahresabschluss
-  CORRECTION = 'CORRECTION', // Umbuchung
-  DEPRECIATION = 'DEPRECIATION', // Automatische AfA
+  PAYROLL = 'PAYROLL',
+  CLOSING = 'CLOSING',
+  CORRECTION = 'CORRECTION',
+  DEPRECIATION = 'DEPRECIATION',
   CREDIT_CARD = 'CREDIT_CARD'
 }
 
-// --- NEW: CONTROLLING / KLR ENTITIES ---
+// Added Account interface to fix "Module has no exported member Account" errors
+export interface Account {
+  id: string;
+  code: string;
+  name: string;
+  type: AccountType;
+  description?: string;
+}
+
 export interface CostCenter {
     id: string;
     code: string; 
@@ -60,34 +67,26 @@ export interface DunningLevelConfig {
     subjectTemplate: string;
     bodyTemplate: string;
     fee: number;
-    daysToPay: number; // Wie viele Tage Frist?
+    daysToPay: number;
 }
 
 export interface CompanySettings {
   companyName: string;
-  ceo: string; // Geschäftsführer
+  ceo: string;
   street: string;
   zip: string;
   city: string;
   country: string;
-  
-  // Tax
-  taxNumber: string; // Steuernummer (für UStVA wichtig)
-  vatId: string; // USt-IdNr.
-  registerCourt: string; // Amtsgericht
-  registerNumber: string; // HRB/HRA
-
-  // Bank
+  taxNumber: string;
+  vatId: string;
+  registerCourt: string;
+  registerNumber: string;
   bankName: string;
   iban: string;
   bic: string;
-  
-  // Contact
   email: string;
   phone: string;
   website: string;
-
-  // Dunning Configuration (Mahnwesen)
   dunningConfig?: {
       level1: DunningLevelConfig;
       level2: DunningLevelConfig;
@@ -97,91 +96,111 @@ export interface CompanySettings {
 
 export interface ContactPerson {
   name: string;
-  role: string; // e.g. "Geschäftsführung", "Buchhaltung"
+  role: string;
   email?: string;
   phone?: string;
 }
 
 export interface Contact {
-  id: string;
+  id: string; // Kundennummer / Lieferantennummer
   name: string;
   type: ContactType;
-  email?: string; // General invoice email (e.g. accounting@)
-  phone?: string;
-  website?: string;
   
-  // Specific Contact Persons (Multiple)
+  // Identität & Kontakt
   contactPersons?: ContactPerson[];
+  email?: string;
+  phone?: string;
+  fax?: string;
+  website?: string;
 
-  // Address
+  // Adresse
   street?: string;
   zip?: string;
   city?: string;
-  country?: string; // default DE
+  country?: string;
 
-  // Bank Details
+  // Finanzen
+  paymentTermsDays?: number; // Zahlungsziel in Tagen
+  discountRate?: number;     // Skonto in %
+  discountDays?: number;     // Skontofrist in Tagen
+  creditLimit?: number;      // Kreditlimit in €
+  glAccount?: string;        // Zugeordnetes Debitoren/Kreditorenkonto (z.B. 1400 / 1600)
+
+  // Steuer
+  vatId?: string;           // USt-IdNr.
+  taxNumber?: string;       // Steuernummer
+  taxStatus?: 'DOMESTIC' | 'EU' | 'THIRD'; // Inland, EU, Drittland
+
+  // Bank
   iban?: string;
   bic?: string;
   bankName?: string;
+  sepaMandateReference?: string; // SEPA-Mandatsreferenz
+  sepaMandateDate?: string;      // Datum des Mandats
 
-  // Legal & Tax
-  vatId?: string; // USt-IdNr.
-  taxNumber?: string; // Steuernummer
-  registerNumber?: string; // HRB / HRA
-}
+  // Lieferdetails (Primär Kreditoren)
+  deliveryTerms?: string;       // Lieferbedingungen (Incoterms etc.)
+  shippingMethod?: string;      // Bevorzugte Versandart
+  // Added preferredShippingMethod to fix type error in ContactForm.tsx
+  preferredShippingMethod?: string;
+  altDeliveryAddress?: string;  // Abweichende Lieferadresse
 
-export interface Account {
-  id: string;
-  code: string;
-  name: string;
-  type: AccountType;
-  description?: string;
+  // Mahnwesen & Sperren
+  dunningLevel?: number;        // Aktuelle Mahnstufe
+  dunningRules?: string;        // Spezielle Mahnregeln
+  blockNote?: string;           // Sperrvermerk (z.B. "Nur Vorkasse")
+  isBlocked?: boolean;
+
+  // Internes
+  notes?: string;
+  category?: string;            // Kunden/Lieferanten-Kategorie
+  defaultCostCenterId?: string;
+  defaultProjectId?: string;
+  registerNumber?: string;      // HRB / HRA
 }
 
 export interface JournalLine {
   accountId: string;
   debit: number;
   credit: number;
-  // Added KLR fields
   costCenterId?: string;
   projectId?: string;
 }
 
 export interface Transaction {
   id: string;
-  date: string; // ISO string YYYY-MM-DD
-  type?: TransactionType; // NEW field
+  date: string;
+  type?: TransactionType;
   description: string;
-  reference?: string; // Internal Document Reference (e.g. "LOB-2025-11", "UM-001")
-  contactId?: string; // Optional link to a debtor/creditor
+  reference?: string;
+  contactId?: string;
   lines: JournalLine[];
-  invoiceId?: string; // Link to an invoice
-  attachments?: string[]; // NEW: List of filenames
+  invoiceId?: string;
+  attachments?: string[];
 }
 
 export interface Invoice {
   id: string;
-  number: string; // Internal Number (RE-2023-001 or ER-2023-001)
-  externalNumber?: string; // NEW: Vendor's Invoice Number (only relevant for incoming)
+  number: string;
+  externalNumber?: string;
   date: string;
-  dueDate: string; // New: Payment deadline
+  dueDate: string;
   contactId: string;
   description: string;
   netAmount: number;
-  taxRate: number; // e.g. 19, 7, 0
+  taxRate: number;
   taxAmount: number;
   grossAmount: number;
   transactionId: string;
-  dunningLevel?: number; // 0 = None, 1 = Reminder, 2 = 1. Warning, 3 = 2. Warning
-  lastDunningDate?: string; // ISO Date of last dunning action
+  dunningLevel?: number;
+  lastDunningDate?: string;
 }
 
-// --- NEW PROCUREMENT TYPES ---
 export enum PurchaseOrderStatus {
-  OFFER = 'OFFER',           // Angebot erhalten
-  ORDERED = 'ORDERED',       // Bestellt
-  DELIVERED = 'DELIVERED',   // Ware/Leistung erhalten
-  COMPLETED = 'COMPLETED'    // Rechnung geprüft & gebucht
+  OFFER = 'OFFER',
+  ORDERED = 'ORDERED',
+  DELIVERED = 'DELIVERED',
+  COMPLETED = 'COMPLETED'
 }
 
 export interface PurchaseOrder {
@@ -189,39 +208,30 @@ export interface PurchaseOrder {
   contactId: string;
   date: string;
   status: PurchaseOrderStatus;
-  offerNumber?: string; // Nummer des Lieferantenangebots
-  orderNumber: string; // Unsere interne Bestellnummer
+  offerNumber?: string;
+  orderNumber: string; 
   description: string;
-  netAmount: number; // Erwarteter Nettobetrag laut Angebot
+  netAmount: number;
   notes?: string;
 }
 
-// --- NEW ASSET MANAGEMENT TYPES ---
 export interface Asset {
-    id: string; // Internal UUID
-    inventoryNumber: string; // e.g. INV-001
-    name: string; // e.g. "VW Golf"
-    glAccountId: string; // Account where AHK is booked (e.g. 0320)
-    
-    purchaseDate: string; // Anschaffungsdatum (Zugang)
-    documentRef?: string; // Rechnungsnummer / Belegnummer
-    
-    cost: number; // Anschaffungskosten (AHK Netto)
-    
-    usefulLifeYears: number; // Nutzungsdauer in Jahren
-    afaCategory?: string; // z.B. "AfA-Tabelle AV" oder "GWG"
-    
-    residualValue: number; // Restwert (usually 0 or 1)
-    
+    id: string;
+    inventoryNumber: string;
+    name: string;
+    glAccountId: string;
+    purchaseDate: string;
+    documentRef?: string;
+    cost: number;
+    usefulLifeYears: number;
+    afaCategory?: string;
+    residualValue: number;
     status: 'ACTIVE' | 'SOLD' | 'SCRAPPED';
-    location?: string; // e.g. "Büro München"
+    location?: string;
 }
 
-export interface FinancialReportData {
-  totalAssets: number;
-  totalLiabilities: number;
-  totalEquity: number;
-  totalRevenue: number;
-  totalExpenses: number;
-  netIncome: number;
+export interface ClientProfile {
+    id: string;
+    name: string;
+    created: string;
 }

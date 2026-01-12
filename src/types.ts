@@ -8,132 +8,18 @@ export enum AccountType {
 }
 
 export enum ContactType {
-  CUSTOMER = 'CUSTOMER', // Debtor
-  VENDOR = 'VENDOR'      // Creditor
+  CUSTOMER = 'CUSTOMER',
+  VENDOR = 'VENDOR'
 }
 
-// NEW: Transaction Types for better categorization
 export enum TransactionType {
-  STANDARD = 'STANDARD',   // Normale Rechnung / Zahlung
-  OPENING_BALANCE = 'OPENING_BALANCE', // NEU: Eröffnungsbilanzbuchung / Vortrag
-  PAYROLL = 'PAYROLL',     // Lohn & Gehalt
-  CLOSING = 'CLOSING',     // Jahresabschluss
-  CORRECTION = 'CORRECTION', // Umbuchung
-  DEPRECIATION = 'DEPRECIATION', // Automatische AfA
-  CREDIT_CARD = 'CREDIT_CARD' // Kreditkartenabrechnung
-}
-
-// --- CONTROLLING / KLR ENTITIES ---
-export interface CostCenter {
-    id: string;
-    code: string; // Nummernkreis z.B. 1000, 2000
-    name: string; // z.B. "Verwaltung", "Fuhrpark"
-    description?: string;
-}
-
-export enum ProjectStatus {
-    PLANNING = 'PLANNING',
-    ACTIVE = 'ACTIVE',
-    COMPLETED = 'COMPLETED'
-}
-
-export interface ProjectBudgetPosition {
-    accountId: string;
-    amount: number;
-}
-
-export interface Project {
-    id: string;
-    code: string; // BV-Nr z.B. BV-2023-001
-    name: string; // z.B. "Neubau Müllerstraße"
-    status: ProjectStatus;
-    startDate: string;
-    endDate?: string;
-    budget?: number; // Gesamtbudget (Fallback oder Summe)
-    budgetPlan?: ProjectBudgetPosition[]; // Detaillierte Budgetierung pro Konto
-    description?: string;
-}
-
-// --- NEU: MANDANTEN-PROFIL ---
-export interface ClientProfile {
-    id: string;
-    name: string;
-    created: string;
-}
-
-export interface DunningLevelConfig {
-    title: string;
-    subjectTemplate: string;
-    bodyTemplate: string;
-    fee: number;
-    daysToPay: number; // Wie viele Tage Frist?
-}
-
-export interface CompanySettings {
-  companyName: string;
-  ceo: string; // Geschäftsführer
-  street: string;
-  zip: string;
-  city: string;
-  country: string;
-  
-  // Tax
-  taxNumber: string; // Steuernummer (für UStVA wichtig)
-  vatId: string; // USt-IdNr.
-  registerCourt: string; // Amtsgericht
-  registerNumber: string; // HRB/HRA
-
-  // Bank
-  bankName: string;
-  iban: string;
-  bic: string;
-  
-  // Contact
-  email: string;
-  phone: string;
-  website: string;
-
-  // Dunning Configuration (Mahnwesen)
-  dunningConfig?: {
-      level1: DunningLevelConfig;
-      level2: DunningLevelConfig;
-      level3: DunningLevelConfig;
-  };
-}
-
-export interface ContactPerson {
-  name: string;
-  role: string; // e.g. "Geschäftsführung", "Buchhaltung"
-  email?: string;
-  phone?: string;
-}
-
-export interface Contact {
-  id: string;
-  name: string;
-  type: ContactType;
-  email?: string; // General invoice email (e.g. accounting@)
-  phone?: string;
-  website?: string;
-  
-  // Specific Contact Persons (Multiple)
-  contactPersons?: ContactPerson[];
-
-  // Address
-  street?: string;
-  zip?: string;
-  city?: string;
-  country?: string; // default DE
-
-  // Bank Details
-  iban?: string;
-  bic?: string;
-  bankName?: string;
-
-  // Legal & Tax
-  vatId?: string; // USt-IdNr.
-  taxNumber?: string; // Steuernummer
-  registerNumber?: string; // HRB / HRA
+  STANDARD = 'STANDARD',
+  OPENING_BALANCE = 'OPENING_BALANCE',
+  PAYROLL = 'PAYROLL',
+  CLOSING = 'CLOSING',
+  CORRECTION = 'CORRECTION',
+  DEPRECIATION = 'DEPRECIATION',
+  CREDIT_CARD = 'CREDIT_CARD'
 }
 
 export interface Account {
@@ -144,50 +30,176 @@ export interface Account {
   description?: string;
 }
 
+export interface CostCenter {
+    id: string;
+    code: string;
+    name: string;
+    description?: string;
+}
+
+// Added ProjectStatus enum to fix "Module has no exported member ProjectStatus" errors
+export enum ProjectStatus {
+    PLANNING = 'PLANNING',
+    ACTIVE = 'ACTIVE',
+    COMPLETED = 'COMPLETED'
+}
+
+// Added ProjectBudgetPosition interface to fix "Module has no exported member ProjectBudgetPosition" errors
+export interface ProjectBudgetPosition {
+    accountId: string;
+    amount: number;
+}
+
+export interface Project {
+    id: string;
+    code: string;
+    name: string;
+    // Changed status from string to ProjectStatus enum to match usage in ControllingView
+    status: ProjectStatus;
+    startDate: string;
+    budget?: number;
+    // Added budgetPlan to fix "Property budgetPlan does not exist on type Project" errors
+    budgetPlan?: ProjectBudgetPosition[];
+}
+
+// Added DunningLevelConfig interface to fix "Module has no exported member DunningLevelConfig" errors
+export interface DunningLevelConfig {
+    title: string;
+    subjectTemplate: string;
+    bodyTemplate: string;
+    fee: number;
+    daysToPay: number;
+}
+
+export interface CompanySettings {
+  companyName: string;
+  ceo: string;
+  street: string;
+  zip: string;
+  city: string;
+  country: string;
+  taxNumber: string;
+  vatId: string;
+  registerCourt: string;
+  registerNumber: string;
+  bankName: string;
+  iban: string;
+  bic: string;
+  email: string;
+  phone: string;
+  website: string;
+  // Updated dunningConfig type from any to a structured object using DunningLevelConfig
+  dunningConfig?: {
+      level1: DunningLevelConfig;
+      level2: DunningLevelConfig;
+      level3: DunningLevelConfig;
+  };
+}
+
+export interface ContactPerson {
+  name: string;
+  role: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  type: ContactType;
+  
+  // Kontakt & Identität
+  contactPersons?: ContactPerson[];
+  email?: string;
+  phone?: string;
+  fax?: string;
+  website?: string;
+
+  // Adresse
+  street?: string;
+  zip?: string;
+  city?: string;
+  country?: string;
+
+  // Finanzen
+  paymentTermsDays?: number;
+  discountRate?: number;
+  discountDays?: number;
+  creditLimit?: number;
+  glAccount?: string; // Standard-Gegenkonto
+
+  // Steuer
+  vatId?: string;
+  taxNumber?: string;
+  taxStatus?: 'DOMESTIC' | 'EU' | 'THIRD';
+
+  // Bank
+  iban?: string;
+  bic?: string;
+  bankName?: string;
+  sepaMandateReference?: string;
+  sepaMandateDate?: string;
+
+  // Lieferdetails
+  deliveryTerms?: string;
+  shippingMethod?: string;
+  altDeliveryAddress?: string;
+
+  // Mahnwesen & Sperren
+  dunningLevel?: number;
+  dunningRules?: string;
+  blockNote?: string; // z.B. "Nur Vorkasse"
+  isBlocked?: boolean;
+
+  // Intern
+  notes?: string;
+  category?: string;
+  defaultCostCenterId?: string;
+  defaultProjectId?: string;
+}
+
 export interface JournalLine {
   accountId: string;
   debit: number;
   credit: number;
-  // KLR ZUORDNUNG
-  costCenterId?: string; // Kostenstelle
-  projectId?: string;    // Kostenträger / BV
+  costCenterId?: string;
+  projectId?: string;
 }
 
 export interface Transaction {
   id: string;
-  date: string; // ISO string YYYY-MM-DD
-  type?: TransactionType; // NEW field
+  date: string;
+  type?: TransactionType;
   description: string;
-  reference?: string; // Internal Document Reference (e.g. "LOB-2025-11", "UM-001")
-  contactId?: string; // Optional link to a debtor/creditor
+  reference?: string;
+  contactId?: string;
   lines: JournalLine[];
-  invoiceId?: string; // Link to an invoice
-  attachments?: string[]; // NEW: List of filenames
+  invoiceId?: string;
+  attachments?: string[];
 }
 
 export interface Invoice {
   id: string;
-  number: string; // Internal Number (RE-2023-001 or ER-2023-001)
-  externalNumber?: string; // NEW: Vendor's Invoice Number (only relevant for incoming)
+  number: string;
+  externalNumber?: string;
   date: string;
-  dueDate: string; // New: Payment deadline
+  dueDate: string;
   contactId: string;
   description: string;
   netAmount: number;
-  taxRate: number; // e.g. 19, 7, 0
+  taxRate: number;
   taxAmount: number;
   grossAmount: number;
   transactionId: string;
-  dunningLevel?: number; // 0 = None, 1 = Reminder, 2 = 1. Warning, 3 = 2. Warning
-  lastDunningDate?: string; // ISO Date of last dunning action
+  dunningLevel?: number;
+  lastDunningDate?: string;
 }
 
-// --- NEW PROCUREMENT TYPES ---
 export enum PurchaseOrderStatus {
-  OFFER = 'OFFER',           // Angebot erhalten
-  ORDERED = 'ORDERED',       // Bestellt
-  DELIVERED = 'DELIVERED',   // Ware/Leistung erhalten
-  COMPLETED = 'COMPLETED'    // Rechnung geprüft & gebucht
+  OFFER = 'OFFER',
+  ORDERED = 'ORDERED',
+  DELIVERED = 'DELIVERED',
+  COMPLETED = 'COMPLETED'
 }
 
 export interface PurchaseOrder {
@@ -195,39 +207,29 @@ export interface PurchaseOrder {
   contactId: string;
   date: string;
   status: PurchaseOrderStatus;
-  offerNumber?: string; // Nummer des Lieferantenangebots
-  orderNumber: string; // Unsere interne Bestellnummer
+  offerNumber?: string;
+  orderNumber: string;
   description: string;
-  netAmount: number; // Erwarteter Nettobetrag laut Angebot
+  netAmount: number;
   notes?: string;
 }
 
-// --- NEW ASSET MANAGEMENT TYPES ---
 export interface Asset {
-    id: string; // Internal UUID
-    inventoryNumber: string; // e.g. INV-001
-    name: string; // e.g. "VW Golf"
-    glAccountId: string; // Account where AHK is booked (e.g. 0320)
-    
-    purchaseDate: string; // Anschaffungsdatum (Zugang)
-    documentRef?: string; // Rechnungsnummer / Belegnummer
-    
-    cost: number; // Anschaffungskosten (AHK Netto)
-    
-    usefulLifeYears: number; // Nutzungsdauer in Jahren
-    afaCategory?: string; // z.B. "AfA-Tabelle AV" oder "GWG"
-    
-    residualValue: number; // Restwert (usually 0 or 1)
-    
+    id: string;
+    inventoryNumber: string;
+    name: string;
+    glAccountId: string;
+    purchaseDate: string;
+    documentRef?: string;
+    cost: number;
+    usefulLifeYears: number;
+    afaCategory?: string;
+    residualValue: number;
     status: 'ACTIVE' | 'SOLD' | 'SCRAPPED';
-    location?: string; // e.g. "Büro München"
 }
 
-export interface FinancialReportData {
-  totalAssets: number;
-  totalLiabilities: number;
-  totalEquity: number;
-  totalRevenue: number;
-  totalExpenses: number;
-  netIncome: number;
+export interface ClientProfile {
+    id: string;
+    name: string;
+    created: string;
 }
