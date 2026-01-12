@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Account, Contact, ContactType, Transaction, Invoice, AccountType, PurchaseOrder, PurchaseOrderStatus, Asset, CostCenter, Project } from '../types';
-import { X, Save, Calculator, ArrowDownCircle, ArrowUpCircle, RefreshCw, BookOpen } from 'lucide-react';
+import { X, Save, Calculator, ArrowDownCircle, ArrowUpCircle, RefreshCw, Calendar } from 'lucide-react';
 
 interface InvoiceFormProps {
   type: 'outgoing' | 'incoming'; 
@@ -20,7 +20,6 @@ interface InvoiceFormProps {
 }
 
 const OUTGOING_TAX_CONFIG = [
-    // Fixed key naming to match usage
     { rate: 19, label: '19% Umsatzsteuer', revenueAccountCode: '8400000', taxAccountCode: '1776000' },
     { rate: 7, label: '7% Umsatzsteuer', revenueAccountCode: '8300000', taxAccountCode: '1771000' },
     { rate: 0, label: 'Steuerfrei / Kleinunternehmer', revenueAccountCode: '8100000', taxAccountCode: null },
@@ -55,6 +54,31 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   const taxAmount = Number((netAmount * (taxConfig.rate / 100)).toFixed(2));
   const grossAmount = Number((netAmount + taxAmount).toFixed(2));
 
+  // --- DYNAMISCHE NUMMERNLOGIK BASIEREND AUF DATUM ---
+  useEffect(() => {
+    if (!date) return;
+    const year = new Date(date).getFullYear();
+    const prefix = isIncoming ? 'ER' : 'RE';
+    
+    // Suche alle existierenden Rechnungen für dieses Präfix und Jahr
+    const yearInvoices = (invoices || []).filter(inv => 
+        inv.number.startsWith(`${prefix}-${year}-`)
+    );
+
+    let maxSeq = 0;
+    yearInvoices.forEach(inv => {
+        const parts = inv.number.split('-');
+        const seq = parseInt(parts[parts.length - 1]);
+        if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+    });
+
+    // Startwerte definieren (ER bei 1, RE bei 1001 für Demo-Zwecke)
+    const baseStart = isIncoming ? 0 : 1000;
+    const nextSeq = Math.max(baseStart, maxSeq) + 1;
+    
+    setInvoiceNumber(`${prefix}-${year}-${nextSeq.toString().padStart(3, '0')}`);
+  }, [date, invoices, isIncoming]);
+
   // Filtern der relevanten Konten (Klasse 8 für Ausgangsrechnungen)
   const revenueAccounts = useMemo(() => 
     accounts.filter(a => a.type === AccountType.REVENUE && a.code.startsWith('8'))
@@ -67,7 +91,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   // Automatische Kontenvorauswahl
   useEffect(() => {
     if (!isIncoming && !selectedRevenueAccountId && revenueAccounts.length > 0) {
-      // Accessing standardized key
       const def = revenueAccounts.find(a => a.code === (taxConfig as any).revenueAccountCode);
       if (def) setSelectedRevenueAccountId(def.id);
     }
@@ -98,36 +121,33 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
         transactionId
     };
 
-    // --- BUCHUNGSSATZ GENERIEREN ---
     const lines = [];
     const klr = { costCenterId: selectedCostCenter || undefined, projectId: selectedProject || undefined };
 
     if (!isIncoming) {
-        // AUSGANGSRECHNUNG (DEBITOREN)
-        const debtorAcc = accounts.find(a => a.code === '1400000'); // Forderungen
+        const debtorAcc = accounts.find(a => a.code === '1400000');
         const revAcc = accounts.find(a => a.id === selectedRevenueAccountId);
         const taxAcc = taxConfig.taxAccountCode ? accounts.find(a => a.code === taxConfig.taxAccountCode) : null;
 
         if (!debtorAcc || !revAcc) { alert("Sammelkonto 1400000 oder Erlöskonto fehlt!"); return; }
 
-        lines.push({ accountId: debtorAcc.id, debit: grossAmount, credit: 0 }); // Soll: Forderung (Brutto)
-        lines.push({ accountId: revAcc.id, debit: 0, credit: netAmount, ...klr }); // Haben: Erlös (Netto)
+        lines.push({ accountId: debtorAcc.id, debit: grossAmount, credit: 0 }); 
+        lines.push({ accountId: revAcc.id, debit: 0, credit: netAmount, ...klr }); 
         if (taxAcc && taxAmount > 0) {
-            lines.push({ accountId: taxAcc.id, debit: 0, credit: taxAmount }); // Haben: USt
+            lines.push({ accountId: taxAcc.id, debit: 0, credit: taxAmount }); 
         }
     } else {
-        // EINGANGSRECHNUNG (KREDITOREN) - Analog implementiert
-        const creditorAcc = accounts.find(a => a.code === '1600000'); // Verbindlichkeiten
-        const expAcc = accounts.find(a => a.id === selectedRevenueAccountId); // Hier Aufwandskonto
+        const creditorAcc = accounts.find(a => a.code === '1600000'); 
+        const expAcc = accounts.find(a => a.id === selectedRevenueAccountId); 
         const taxAcc = taxConfig.taxAccountCode ? accounts.find(a => a.code === taxConfig.taxAccountCode) : null;
 
         if (!creditorAcc || !expAcc) { alert("Sammelkonto 1600000 oder Aufwandskonto fehlt!"); return; }
 
-        lines.push({ accountId: expAcc.id, debit: netAmount, credit: 0, ...klr }); // Soll: Aufwand (Netto)
+        lines.push({ accountId: expAcc.id, debit: netAmount, credit: 0, ...klr }); 
         if (taxAcc && taxAmount > 0) {
-            lines.push({ accountId: taxAcc.id, debit: taxAmount, credit: 0 }); // Soll: VSt
+            lines.push({ accountId: taxAcc.id, debit: taxAmount, credit: 0 }); 
         }
-        lines.push({ accountId: creditorAcc.id, debit: 0, credit: grossAmount }); // Haben: Verbindlichkeit (Brutto)
+        lines.push({ accountId: creditorAcc.id, debit: 0, credit: grossAmount }); 
     }
 
     const newTransaction: Transaction = {
@@ -144,7 +164,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   };
 
   const themeColor = isIncoming ? 'orange' : 'blue';
-  // Defined buttonColor to fix the missing name error
   const buttonColor = isIncoming ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700';
 
   return (
@@ -165,21 +184,24 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
         <form onSubmit={handleSubmit} className="p-8 overflow-y-auto flex-1 space-y-6">
           <div className="grid grid-cols-2 gap-6">
             <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Rechnungs-Nr.</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Belegdatum (bestimmt das Jahr)</label>
                 <div className="relative">
-                    <input type="text" required value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"/>
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300"><RefreshCw className="w-3 h-3" /></div>
+                    <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none pr-10" />
+                    <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 </div>
             </div>
             <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Belegdatum</label>
-                <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vorgeschlagene Nr.</label>
+                <div className="relative">
+                    <input type="text" required value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono bg-slate-50"/>
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300" title="Nummer passt sich automatisch dem Jahr an"><RefreshCw className="w-3 h-3" /></div>
+                </div>
             </div>
           </div>
 
           <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{isIncoming ? 'Lieferant' : 'Kunde'}</label>
-              <select value={contactId} onChange={(e) => setContactId(e.target.value)} className="w-full p-2.5 border rounded-lg bg-white" required>
+              <select value={contactId} onChange={(e) => setContactId(e.target.value)} className="w-full p-2.5 border rounded-lg bg-white shadow-sm" required>
                 <option value="">-- Kontakt wählen --</option>
                 {contacts.filter(c => c.type === (isIncoming ? ContactType.VENDOR : ContactType.CUSTOMER)).map(c => (
                   <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
@@ -193,11 +215,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
              <div className="grid grid-cols-2 gap-6 mb-4">
                  <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Nettobetrag (€)</label>
-                    <input type="number" step="0.01" required value={netAmount || ''} onChange={(e) => setNetAmount(parseFloat(e.target.value))} className="w-full p-2.5 border rounded-lg text-right font-mono font-bold text-lg"/>
+                    <input type="number" step="0.01" required value={netAmount || ''} onChange={(e) => setNetAmount(parseFloat(e.target.value))} className="w-full p-2.5 border rounded-lg text-right font-mono font-bold text-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0.00"/>
                  </div>
                  <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Steuersatz</label>
-                    <select value={selectedTaxIndex} onChange={(e) => setSelectedTaxIndex(Number(e.target.value))} className="w-full p-2.5 border rounded-lg bg-white">
+                    <select value={selectedTaxIndex} onChange={(e) => setSelectedTaxIndex(Number(e.target.value))} className="w-full p-2.5 border rounded-lg bg-white outline-none">
                         {(isIncoming ? INCOMING_TAX_CONFIG : OUTGOING_TAX_CONFIG).map((conf, i) => <option key={i} value={i}>{conf.label}</option>)}
                     </select>
                  </div>
@@ -205,7 +227,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
 
              <div className="mb-4">
                  <label className="block text-sm font-medium text-slate-700 mb-1">{isIncoming ? 'Aufwandskonto' : 'Erlöskonto (Klasse 8)'}</label>
-                 <select value={selectedRevenueAccountId} onChange={(e) => setSelectedRevenueAccountId(e.target.value)} className="w-full p-2.5 border rounded-lg bg-white" required>
+                 <select value={selectedRevenueAccountId} onChange={(e) => setSelectedRevenueAccountId(e.target.value)} className="w-full p-2.5 border rounded-lg bg-white outline-none font-medium" required>
                      <option value="">-- Sachkonto wählen --</option>
                      {(isIncoming ? expenseAccounts : revenueAccounts).map(acc => (
                          <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
@@ -213,7 +235,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                  </select>
              </div>
 
-             {/* Buchungsvorschau */}
              <div className="bg-white/70 p-4 rounded-lg border border-slate-200 text-xs font-mono">
                 <p className="font-bold text-slate-400 uppercase text-[10px] mb-2 tracking-widest">Buchungsvorschau</p>
                 <div className="flex justify-between border-b border-slate-100 pb-1 mb-1">
@@ -235,8 +256,8 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
         </form>
 
         <div className="p-6 bg-slate-50 border-t flex justify-end gap-3">
-            <button onClick={onClose} className="px-4 py-2 border rounded-lg text-slate-600 hover:bg-white">Abbrechen</button>
-            <button onClick={handleSubmit} className={`flex items-center px-6 py-2 text-white rounded-lg font-bold shadow-lg ${buttonColor}`}>
+            <button onClick={onClose} className="px-4 py-2 border rounded-lg text-slate-600 hover:bg-white transition-colors">Abbrechen</button>
+            <button onClick={handleSubmit} className={`flex items-center px-6 py-2 text-white rounded-lg font-bold shadow-lg ${buttonColor} transition-all active:scale-95`}>
               <Save className="w-4 h-4 mr-2" /> Rechnung buchen
             </button>
         </div>
