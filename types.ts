@@ -15,10 +15,44 @@ export enum ContactType {
 // NEW: Transaction Types for better categorization
 export enum TransactionType {
   STANDARD = 'STANDARD',   // Normale Rechnung / Zahlung
+  // Added missing types
+  OPENING_BALANCE = 'OPENING_BALANCE',
   PAYROLL = 'PAYROLL',     // Lohn & Gehalt
   CLOSING = 'CLOSING',     // Jahresabschluss
   CORRECTION = 'CORRECTION', // Umbuchung
-  DEPRECIATION = 'DEPRECIATION' // Automatische AfA
+  DEPRECIATION = 'DEPRECIATION', // Automatische AfA
+  CREDIT_CARD = 'CREDIT_CARD'
+}
+
+// --- NEW: CONTROLLING / KLR ENTITIES ---
+export interface CostCenter {
+    id: string;
+    code: string; 
+    name: string; 
+    description?: string;
+}
+
+export enum ProjectStatus {
+    PLANNING = 'PLANNING',
+    ACTIVE = 'ACTIVE',
+    COMPLETED = 'COMPLETED'
+}
+
+export interface ProjectBudgetPosition {
+    accountId: string;
+    amount: number;
+}
+
+export interface Project {
+    id: string;
+    code: string; 
+    name: string; 
+    status: ProjectStatus;
+    startDate: string;
+    endDate?: string;
+    budget?: number; 
+    budgetPlan?: ProjectBudgetPosition[]; 
+    description?: string;
 }
 
 export interface DunningLevelConfig {
@@ -108,6 +142,9 @@ export interface JournalLine {
   accountId: string;
   debit: number;
   credit: number;
+  // Added KLR fields
+  costCenterId?: string;
+  projectId?: string;
 }
 
 export interface Transaction {
