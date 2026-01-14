@@ -14,6 +14,8 @@ import { TransactionForm } from './components/TransactionForm';
 import { AIAssistantView } from './components/AIAssistantView';
 import { ControllingView } from './components/ControllingView';
 import { ClosingView } from './components/ClosingView';
+import { ArchiveView } from './components/ArchiveView';
+import { StornoForm } from './components/StornoForm';
 import { Account, AccountType, Contact, ContactType, Transaction, TransactionType, Invoice, CompanySettings, Asset, ClientProfile, CostCenter, Project, PurchaseOrder } from './types';
 import { skr03Accounts } from './data/skr03';
 
@@ -88,6 +90,7 @@ function useStickyState<T>(key: string, defaultValue: T): [T, React.Dispatch<Rea
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [stornoContext, setStornoContext] = useState<{invId: string, conId: string} | null>(null);
   
   const [companySettings, setCompanySettings] = useStickyState<CompanySettings>('settings', initialCompanySettings);
   const [transactions, setTransactions] = useStickyState<Transaction[]>('transactions', []);
@@ -116,20 +119,16 @@ const App: React.FC = () => {
   };
 
   const handleSaveStorno = (stornoTx: Transaction, originalInvoiceId: string) => {
-      // 1. Storno-Transaktion speichern
       setTransactions(prev => [stornoTx, ...prev]);
-      
-      // 2. Original-Rechnung als storniert markieren
       setInvoices(prev => prev.map(inv => 
           inv.id === originalInvoiceId ? { ...inv, isReversed: true } : inv
       ));
-
-      // 3. Verknüpfte Original-Transaktion ebenfalls markieren
       if (stornoTx.reversesId) {
           setTransactions(prev => prev.map(t => 
               t.id === stornoTx.reversesId ? { ...t, isReversed: true, reversedBy: stornoTx.id } : t
           ));
       }
+      setStornoContext(null);
   };
 
   const handleUpdateInvoice = (updatedInvoice: Invoice) => {
@@ -167,6 +166,16 @@ const App: React.FC = () => {
         return <AIAssistantView />;
       case 'analytics':
         return <Dashboard transactions={transactions} accounts={accounts} />;
+      case 'archive':
+        return (
+            <ArchiveView 
+                invoices={invoices}
+                transactions={transactions}
+                contacts={contacts}
+                accounts={accounts}
+                onOpenStorno={(invId, conId) => setStornoContext({invId, conId})}
+            />
+        );
       case 'ledger':
         return (
           <LedgerView 
@@ -175,7 +184,6 @@ const App: React.FC = () => {
             invoices={invoices} 
             companySettings={companySettings}
             onUpdateAccount={handleUpdateAccount}
-            // fix: onAddAccount is now added to LedgerViewProps
             onAddAccount={(acc) => setAccounts([...accounts, acc])}
           />
         );
@@ -263,13 +271,22 @@ const App: React.FC = () => {
       {showTransactionModal && (
         <TransactionForm 
           accounts={accounts}
-          // costCenters and projects are now added to TransactionFormProps
           costCenters={costCenters}
           projects={projects}
           existingTransactions={transactions}
           onSave={handleSaveTransaction}
           onClose={() => setShowTransactionModal(false)}
         />
+      )}
+
+      {stornoContext && (
+          <StornoForm 
+            contact={contacts.find(c => c.id === stornoContext.conId)!}
+            invoices={invoices}
+            transactions={transactions}
+            onSave={handleSaveStorno}
+            onClose={() => setStornoContext(null)}
+          />
       )}
     </>
   );
