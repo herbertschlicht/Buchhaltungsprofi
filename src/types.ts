@@ -19,7 +19,8 @@ export enum TransactionType {
   CLOSING = 'CLOSING',
   CORRECTION = 'CORRECTION',
   DEPRECIATION = 'DEPRECIATION',
-  CREDIT_CARD = 'CREDIT_CARD'
+  CREDIT_CARD = 'CREDIT_CARD',
+  REVERSAL = 'REVERSAL' // Neu für Storno
 }
 
 export interface Account {
@@ -37,14 +38,12 @@ export interface CostCenter {
     description?: string;
 }
 
-// Added ProjectStatus enum to fix "Module has no exported member ProjectStatus" errors
 export enum ProjectStatus {
     PLANNING = 'PLANNING',
     ACTIVE = 'ACTIVE',
     COMPLETED = 'COMPLETED'
 }
 
-// Added ProjectBudgetPosition interface to fix "Module has no exported member ProjectBudgetPosition" errors
 export interface ProjectBudgetPosition {
     accountId: string;
     amount: number;
@@ -54,15 +53,12 @@ export interface Project {
     id: string;
     code: string;
     name: string;
-    // Changed status from string to ProjectStatus enum to match usage in ControllingView
     status: ProjectStatus;
     startDate: string;
     budget?: number;
-    // Added budgetPlan to fix "Property budgetPlan does not exist on type Project" errors
     budgetPlan?: ProjectBudgetPosition[];
 }
 
-// Added DunningLevelConfig interface to fix "Module has no exported member DunningLevelConfig" errors
 export interface DunningLevelConfig {
     title: string;
     subjectTemplate: string;
@@ -88,7 +84,6 @@ export interface CompanySettings {
   email: string;
   phone: string;
   website: string;
-  // Updated dunningConfig type from any to a structured object using DunningLevelConfig
   dunningConfig?: {
       level1: DunningLevelConfig;
       level2: DunningLevelConfig;
@@ -107,51 +102,35 @@ export interface Contact {
   id: string;
   name: string;
   type: ContactType;
-  
-  // Kontakt & Identität
   contactPersons?: ContactPerson[];
   email?: string;
   phone?: string;
   fax?: string;
   website?: string;
-
-  // Adresse
   street?: string;
   zip?: string;
   city?: string;
   country?: string;
-
-  // Finanzen
   paymentTermsDays?: number;
   discountRate?: number;
   discountDays?: number;
   creditLimit?: number;
-  glAccount?: string; // Standard-Gegenkonto
-
-  // Steuer
+  glAccount?: string;
   vatId?: string;
   taxNumber?: string;
   taxStatus?: 'DOMESTIC' | 'EU' | 'THIRD';
-
-  // Bank
   iban?: string;
   bic?: string;
   bankName?: string;
   sepaMandateReference?: string;
   sepaMandateDate?: string;
-
-  // Lieferdetails
   deliveryTerms?: string;
   shippingMethod?: string;
   altDeliveryAddress?: string;
-
-  // Mahnwesen & Sperren
   dunningLevel?: number;
   dunningRules?: string;
-  blockNote?: string; // z.B. "Nur Vorkasse"
+  blockNote?: string;
   isBlocked?: boolean;
-
-  // Intern
   notes?: string;
   category?: string;
   defaultCostCenterId?: string;
@@ -176,6 +155,11 @@ export interface Transaction {
   lines: JournalLine[];
   invoiceId?: string;
   attachments?: string[];
+  // Storno Felder
+  isReversed?: boolean;
+  reversedBy?: string;
+  reversesId?: string;
+  stornoReason?: string;
 }
 
 export interface Invoice {
@@ -193,6 +177,7 @@ export interface Invoice {
   transactionId: string;
   dunningLevel?: number;
   lastDunningDate?: string;
+  isReversed?: boolean; // Neu
 }
 
 export enum PurchaseOrderStatus {

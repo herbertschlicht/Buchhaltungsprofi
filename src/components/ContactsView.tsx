@@ -1,29 +1,27 @@
 
 import React, { useState } from 'react';
-import { Contact, Transaction, Account, ContactType, Invoice, PurchaseOrder, PurchaseOrderStatus, CompanySettings, Asset, CostCenter, Project } from '../types';
+import { Contact, Transaction, Account, ContactType, Invoice, PurchaseOrder, CompanySettings, Asset, CostCenter, Project } from '../types';
 import { getContactBalance, getInvoicePaymentStatus, getContactLedgerStats } from '../utils/accounting';
 import { 
     PlusCircle, 
     FileText, 
-    AlertCircle, 
     Briefcase, 
     Users, 
-    Send, 
     Search,
     LayoutDashboard,
     Wallet,
     Database,
-    ShoppingCart,
     Calendar,
-    Printer,
     Building2,
     ListChecks,
     TrendingUp,
     Ban,
-    CheckCircle
+    CheckCircle,
+    History
 } from 'lucide-react';
 import { InvoiceForm } from './InvoiceForm';
 import { ContactForm } from './ContactForm';
+import { StornoForm } from './StornoForm';
 
 interface ContactsViewProps {
   contacts: Contact[];
@@ -38,6 +36,7 @@ interface ContactsViewProps {
   onSavePurchaseOrder?: (order: PurchaseOrder, transaction?: Transaction, invoice?: Invoice) => void;
   onUpdateInvoice?: (updatedInvoice: Invoice) => void;
   onAddContact?: (contact: Contact) => void; 
+  onSaveStorno?: (stornoTx: Transaction, originalInvoiceId: string) => void; // Neu
   nextInvoiceNumber?: string;
   nextOrderNumber?: string;
   nextAssetId?: string; 
@@ -54,6 +53,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
     companySettings,
     onSaveInvoice,
     onAddContact,
+    onSaveStorno,
     nextInvoiceNumber = "RE-2023-1000",
     viewMode
 }) => {
@@ -63,6 +63,8 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
 
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
+  const [showStornoForm, setShowStornoForm] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
 
   const relevantContacts = contacts.filter(c => 
       viewMode === 'debtors' ? c.type === ContactType.CUSTOMER : c.type === ContactType.VENDOR
@@ -73,6 +75,16 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       c.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.id.includes(searchTerm)
   ).sort((a,b) => a.name.localeCompare(b.name));
+
+  const oposList = invoices.map(inv => {
+      const stats = getInvoicePaymentStatus(inv, transactions);
+      const contact = contacts.find(c => c.id === inv.contactId);
+      return { ...inv, ...stats, contactName: contact?.name };
+  }).filter(item => {
+      const contact = contacts.find(c => c.id === item.contactId);
+      if (contact?.type !== (viewMode === 'debtors' ? ContactType.CUSTOMER : ContactType.VENDOR)) return false;
+      return item.status !== 'PAID' && item.status !== 'CREDIT_NOTE' && !item.isReversed;
+  }).sort((a,b) => a.dueDate.localeCompare(b.dueDate));
 
   const calculateTotalDue = () => {
       return relevantContacts.reduce((acc, c) => acc + getContactBalance(c.id, transactions, accounts), 0);
@@ -86,7 +98,15 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       return prefix + (max + 1).toString();
   };
 
-  const fmt = (n: number) => n === 0 ? '-' : n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const openStorno = (contactId?: string) => {
+      if (contactId) {
+          const c = contacts.find(con => con.id === contactId);
+          if (c) setSelectedContact(c);
+      } else {
+          setSelectedContact(null);
+      }
+      setShowStornoForm(true);
+  };
 
   return (
     <div className="space-y-6 h-full flex flex-col">
@@ -124,7 +144,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                           <p className="text-3xl font-bold text-slate-800 mt-2">{calculateTotalDue().toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</p>
                       </div>
                       <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 flex flex-col justify-center items-start">
-                          <p className="text-blue-600 text-sm font-medium uppercase mb-3">Schnellzugriff</p>
+                          <p className="text-blue-600 text-sm font-medium uppercase mb-3">Rechnungswesen</p>
                           <button 
                                 onClick={() => setShowInvoiceForm(true)}
                                 className={`w-full flex items-center justify-center px-4 py-3 text-white rounded-lg font-bold shadow-md transition-all hover:scale-105 ${viewMode === 'debtors' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'}`}
@@ -133,19 +153,60 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                                 {viewMode === 'debtors' ? 'Neue Ausgangsrechnung' : 'Neue Eingangsrechnung'}
                             </button>
                       </div>
-                      <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex flex-col justify-center items-start">
-                        <p className="text-slate-500 text-sm font-medium uppercase mb-3">Verwaltung</p>
+                      <div className="bg-red-50 p-6 rounded-xl border border-red-100 flex flex-col justify-center items-start">
+                        <p className="text-red-600 text-sm font-medium uppercase mb-3">Korrekturen</p>
                         <button 
-                                onClick={() => setShowContactForm(true)}
-                                className="w-full flex items-center justify-center px-4 py-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg font-medium transition-all"
+                                onClick={() => openStorno()}
+                                className="w-full flex items-center justify-center px-4 py-2 bg-white border border-red-200 text-red-700 hover:bg-red-50 rounded-lg font-bold transition-all shadow-sm"
                             >
-                                <Users className="w-4 h-4 mr-2"/> Neuer Kontakt anlegen
+                                <History className="w-4 h-4 mr-2"/> Generalstorno buchen
                             </button>
                       </div>
                   </div>
               </div>
           )}
           
+          {activeTab === 'opos' && (
+              <div className="overflow-auto flex-1">
+                  <table className="w-full text-left">
+                      <thead className="bg-slate-100 text-[10px] text-slate-500 uppercase font-semibold border-b border-slate-200">
+                          <tr>
+                              <th className="p-4">Nr.</th>
+                              <th className="p-4">Datum / Fällig</th>
+                              <th className="p-4">Kontakt</th>
+                              <th className="p-4 text-right">Offen (Netto)</th>
+                              <th className="p-4 text-right">Offen (Brutto)</th>
+                              <th className="p-4 text-center">Aktion</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                          {oposList.map(inv => (
+                              <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                                  <td className="p-4 text-xs font-mono font-bold">{inv.number}</td>
+                                  <td className="p-4 text-xs">
+                                      <div>{new Date(inv.date).toLocaleDateString('de-DE')}</div>
+                                      <div className="text-red-500 font-bold">{new Date(inv.dueDate).toLocaleDateString('de-DE')}</div>
+                                  </td>
+                                  <td className="p-4 font-bold text-slate-800 text-sm">{inv.contactName}</td>
+                                  <td className="p-4 text-right font-mono">{inv.netAmount.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
+                                  <td className="p-4 text-right font-mono font-bold text-blue-700">{inv.remainingAmount.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
+                                  <td className="p-4 text-center">
+                                      <button 
+                                        onClick={() => openStorno(inv.contactId)}
+                                        className="p-2 text-slate-400 hover:text-red-600"
+                                        title="Stornieren"
+                                      >
+                                          <History className="w-4 h-4" />
+                                      </button>
+                                  </td>
+                              </tr>
+                          ))}
+                          {oposList.length === 0 && <tr><td colSpan={6} className="p-12 text-center text-slate-400">Keine offenen Posten vorhanden.</td></tr>}
+                      </tbody>
+                  </table>
+              </div>
+          )}
+
           {activeTab === 'list' && (
               <div className="flex flex-col h-full">
                   <div className="p-4 border-b border-slate-100 flex gap-4 bg-slate-50/50">
@@ -153,8 +214,8 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                             <input type="text" placeholder="Suche nach Namen, Ort, ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none bg-white shadow-sm"/>
                         </div>
-                        <button onClick={() => setShowContactForm(true)} className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-all shadow-sm flex items-center">
-                            <PlusCircle className="w-4 h-4 mr-2"/> Kontakt hinzufügen
+                        <button onClick={() => setShowContactForm(true)} className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-all shadow-sm flex items-center text-sm font-bold">
+                            <PlusCircle className="w-4 h-4 mr-2 text-blue-600"/> Kontakt hinzufügen
                         </button>
                   </div>
                   <div className="overflow-auto flex-1">
@@ -217,8 +278,8 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
           {activeTab === 'balances' && (
               <div className="p-8 text-center text-slate-400">... Saldenliste per Stichtag ...</div>
           )}
-          {activeTab === 'opos' && (
-              <div className="p-8 text-center text-slate-400">... OPOS Liste ...</div>
+          {activeTab === 'invoices' && (
+              <div className="p-8 text-center text-slate-400 italic">... Vollständiges Rechnungsarchiv ...</div>
           )}
 
       </div>
@@ -234,7 +295,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
             transactions={transactions}
             nextInvoiceNumber={nextInvoiceNumber}
             onSave={onSaveInvoice}
-            onAddContact={onAddContact || (() => {})} // Sicherstellen, dass die Prop weitergereicht wird
+            onAddContact={onAddContact || (() => {})} 
             onClose={() => setShowInvoiceForm(false)} 
         />
       )}
@@ -247,6 +308,19 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
             projects={projects}
             onSave={onAddContact}
             onClose={() => setShowContactForm(false)}
+          />
+      )}
+
+      {showStornoForm && onSaveStorno && (
+          <StornoForm 
+            contact={selectedContact || contacts.filter(c => c.type === (viewMode === 'debtors' ? 'CUSTOMER' : 'VENDOR'))[0]}
+            invoices={invoices}
+            transactions={transactions}
+            onSave={(stornoTx, originalId) => {
+                onSaveStorno(stornoTx, originalId);
+                setShowStornoForm(false);
+            }}
+            onClose={() => setShowStornoForm(false)}
           />
       )}
     </div>

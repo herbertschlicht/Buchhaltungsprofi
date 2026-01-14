@@ -115,6 +115,23 @@ const App: React.FC = () => {
     if (newAsset) setAssets(prev => [...prev, newAsset]);
   };
 
+  const handleSaveStorno = (stornoTx: Transaction, originalInvoiceId: string) => {
+      // 1. Storno-Transaktion speichern
+      setTransactions(prev => [stornoTx, ...prev]);
+      
+      // 2. Original-Rechnung als storniert markieren
+      setInvoices(prev => prev.map(inv => 
+          inv.id === originalInvoiceId ? { ...inv, isReversed: true } : inv
+      ));
+
+      // 3. Optional: Ursprungstransaktion ebenfalls markieren
+      if (stornoTx.reversesId) {
+          setTransactions(prev => prev.map(t => 
+              t.id === stornoTx.reversesId ? { ...t, isReversed: true, reversedBy: stornoTx.id } : t
+          ));
+      }
+  };
+
   const handleUpdateInvoice = (updatedInvoice: Invoice) => {
       setInvoices(prev => prev.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv));
   };
@@ -188,6 +205,7 @@ const App: React.FC = () => {
                 onSaveInvoice={handleSaveInvoice}
                 onUpdateInvoice={handleUpdateInvoice}
                 onAddContact={handleAddContact}
+                onSaveStorno={handleSaveStorno}
                 nextInvoiceNumber={nextInvoiceNum}
             />
         );
@@ -202,6 +220,7 @@ const App: React.FC = () => {
                 companySettings={companySettings}
                 onSaveInvoice={handleSaveInvoice}
                 onAddContact={handleAddContact}
+                onSaveStorno={handleSaveStorno}
                 nextInvoiceNumber={nextInvoiceNum} 
             />
         );
