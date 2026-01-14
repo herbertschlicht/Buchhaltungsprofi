@@ -14,93 +14,33 @@ import { TransactionForm } from './components/TransactionForm';
 import { AIAssistantView } from './components/AIAssistantView';
 import { ControllingView } from './components/ControllingView';
 import { ClosingView } from './components/ClosingView';
-import { Account, AccountType, Contact, ContactType, Transaction, TransactionType, Invoice, PurchaseOrder, PurchaseOrderStatus, CompanySettings, Asset, ClientProfile, CostCenter, Project } from './types';
+import { Account, AccountType, Contact, ContactType, Transaction, TransactionType, Invoice, CompanySettings, Asset, ClientProfile, CostCenter, Project, PurchaseOrder } from './types';
 import { skr03Accounts } from './data/skr03';
 
-// --- INITIAL DATA SEEDING ---
+// Initialisierungsdaten
 const initialAccounts: Account[] = skr03Accounts;
-
 const initialCompanySettings: CompanySettings = {
-  companyName: 'LedgerLens Demo Corp',
+  companyName: 'BuchhaltungsProfi Demo',
   ceo: 'Max Mustermann',
-  street: 'Musterstraße 1',
+  street: 'Beispielweg 10',
   zip: '10115',
   city: 'Berlin',
   country: 'Deutschland',
   taxNumber: '12/345/67890',
   vatId: 'DE123456789',
-  registerCourt: 'Amtsgericht Berlin-Charlottenburg',
-  registerNumber: 'HRB 12345',
-  bankName: 'Berliner Volksbank',
-  iban: 'DE99 1001 0010 1234 5678 90',
-  bic: 'GENODEF1BRL',
-  email: 'buchhaltung@ledgerlens.de',
+  registerCourt: 'Amtsgericht Berlin',
+  registerNumber: 'HRB 99999',
+  bankName: 'Berliner Bank',
+  iban: 'DE99 1234 5678 9012 3456 78',
+  bic: 'BERLDEF1XXX',
+  email: 'info@buchhaltungsprofi.de',
   phone: '030 / 123 456 78',
-  website: 'www.ledgerlens.de',
-  
-  dunningConfig: {
-      level1: {
-          title: "Zahlungserinnerung",
-          subjectTemplate: "Zahlungserinnerung zur Rechnung Nr. [NR]",
-          bodyTemplate: `sehr geehrte Damen und Herren,\n\nsicherlich haben Sie in der Hektik des Alltags übersehen, unsere Rechnung Nr. [NR] vom [DATUM] zu begleichen.\n\nWir bitten Sie, den fälligen Betrag in Höhe von [BETRAG] € bis zum [FRIST] auf unser unten genanntes Konto zu überweisen.\n\nSollten Sie die Zahlung inzwischen geleistet haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.`,
-          fee: 0.00,
-          daysToPay: 7
-      },
-      level2: {
-          title: "1. Mahnung",
-          subjectTemplate: "1. Mahnung zur Rechnung Nr. [NR]",
-          bodyTemplate: `sehr geehrte Damen und Herren,\n\nleider konnten wir bis heute keinen Zahlungseingang für unsere Rechnung Nr. [NR] feststellen. Auch auf unsere Zahlungserinnerung haben Sie nicht reagiert.\n\nWir bitten Sie nunmehr nachdrücklich, den offenen Betrag zuzüglich einer Mahngebühr von [GEBUEHR] € sofort zu überweisen.\n\nGesamtbetrag fällig: [GESAMT] €`,
-          fee: 5.00,
-          daysToPay: 5
-      },
-      level3: {
-          title: "Letzte Mahnung",
-          subjectTemplate: "LETZTE MAHNUNG zur Rechnung Nr. [NR]",
-          bodyTemplate: `sehr geehrte Damen und Herren,\n\nda Sie auf unsere bisherigen Schreiben nicht reagiert haben, fordern wir Sie hiermit letztmalig auf, den fälligen Gesamtbetrag bis zum [FRIST] zu begleichen.\n\nSollte der Betrag nicht fristgerecht eingehen, werden wir die Forderung ohne weitere Ankündigung an unser Inkassobüro übergeben. Die hierdurch entstehenden Mehrkosten gehen zu Ihren Lasten.\n\nMahngebühr: [GEBUEHR] €\nGesamtbetrag fällig: [GESAMT] €`,
-          fee: 10.00,
-          daysToPay: 3
-      }
-  }
+  website: 'www.buchhaltungsprofi.de'
 };
 
 const initialContacts: Contact[] = [
-  { 
-    id: 'D10000', 
-    name: 'Müller Bau GmbH', 
-    type: ContactType.CUSTOMER, 
-    city: 'München',
-    street: 'Gewerbestr. 12',
-    zip: '80331',
-    country: 'Deutschland',
-    email: 'info@mueller-bau.de',
-    phone: '089/123456',
-    paymentTermsDays: 14,
-    taxStatus: 'DOMESTIC',
-    vatId: 'DE811223344',
-    glAccount: '1400000',
-    category: 'A-Kunde',
-    contactPersons: [{ name: 'Hans Müller', role: 'Geschäftsführung' }]
-  },
-  { 
-    id: 'K70000', 
-    name: 'Baustoff-Union SE', 
-    type: ContactType.VENDOR, 
-    city: 'Hamburg',
-    street: 'Hafenstr. 99',
-    zip: '20457',
-    country: 'Deutschland',
-    email: 'order@baustoff-union.de',
-    phone: '040/987654',
-    paymentTermsDays: 30,
-    discountRate: 2,
-    discountDays: 10,
-    taxStatus: 'DOMESTIC',
-    iban: 'DE12 3456 7890 1234 5678 90',
-    bankName: 'Deutsche Bank',
-    glAccount: '1600000',
-    deliveryTerms: 'Frei Baustelle',
-    contactPersons: [{ name: 'Anja Schmidt', role: 'Vertrieb' }]
-  }
+  { id: 'D10000', name: 'Müller Bau GmbH', type: ContactType.CUSTOMER, city: 'München', glAccount: '1400000' },
+  { id: 'K70000', name: 'Baustoff SE', type: ContactType.VENDOR, city: 'Hamburg', glAccount: '1600000' }
 ];
 
 function useStickyState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
@@ -139,8 +79,6 @@ const App: React.FC = () => {
 
   const currentYear = new Date().getFullYear();
   const [nextInvoiceNum, setNextInvoiceNum] = useStickyState<string>('nextInvoiceNum', `RE-${currentYear}-1001`);
-  const [nextIncomingInvoiceNum, setNextIncomingInvoiceNum] = useStickyState<string>('nextIncomingInvoiceNum', `ER-${currentYear}-001`);
-  const [nextOrderNum, setNextOrderNum] = useStickyState<string>('nextOrderNum', `B-${currentYear}-001`);
 
   const handleSaveTransaction = (transaction: Transaction) => {
     setTransactions(prev => [transaction, ...prev]);
@@ -150,6 +88,18 @@ const App: React.FC = () => {
     setInvoices(prev => [...prev, invoice]);
     setTransactions(prev => [transaction, ...prev]);
     if (newAsset) setAssets(prev => [...prev, newAsset]);
+  };
+
+  const handleSaveStorno = (stornoTx: Transaction, originalInvoiceId: string) => {
+      setTransactions(prev => [stornoTx, ...prev]);
+      setInvoices(prev => prev.map(inv => 
+          inv.id === originalInvoiceId ? { ...inv, isReversed: true } : inv
+      ));
+      if (stornoTx.reversesId) {
+          setTransactions(prev => prev.map(t => 
+              t.id === stornoTx.reversesId ? { ...t, isReversed: true, reversedBy: stornoTx.id } : t
+          ));
+      }
   };
 
   const handleUpdateInvoice = (updatedInvoice: Invoice) => {
@@ -225,6 +175,7 @@ const App: React.FC = () => {
                 onSaveInvoice={handleSaveInvoice}
                 onUpdateInvoice={handleUpdateInvoice}
                 onAddContact={handleAddContact}
+                onSaveStorno={handleSaveStorno}
                 nextInvoiceNumber={nextInvoiceNum}
             />
         );
@@ -237,17 +188,11 @@ const App: React.FC = () => {
                 accounts={accounts} 
                 invoices={invoices}
                 companySettings={companySettings}
-                purchaseOrders={purchaseOrders} 
-                costCenters={costCenters}
-                projects={projects}
-                onSavePurchaseOrder={(order, tx, inv) => {
-                    setPurchaseOrders(prev => [...prev, order]);
-                    if (tx && inv) handleSaveInvoice(inv, tx);
-                }} 
                 onSaveInvoice={handleSaveInvoice}
+                onUpdateInvoice={handleUpdateInvoice}
                 onAddContact={handleAddContact}
-                nextInvoiceNumber={nextIncomingInvoiceNum} 
-                nextOrderNumber={nextOrderNum} 
+                onSaveStorno={handleSaveStorno}
+                nextInvoiceNumber={nextInvoiceNum} 
             />
         );
       case 'payments':

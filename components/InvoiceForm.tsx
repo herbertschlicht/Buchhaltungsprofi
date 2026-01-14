@@ -17,6 +17,8 @@ interface InvoiceFormProps {
   nextInvoiceNumber: string; 
   nextAssetNumber?: string; 
   onSave: (invoice: Invoice, transaction: Transaction, newAsset?: Asset) => void;
+  // Added missing onAddContact property
+  onAddContact: (contact: Contact) => void;
   onSwitchToOrder?: (order: PurchaseOrder) => void; 
   onClose: () => void;
 }

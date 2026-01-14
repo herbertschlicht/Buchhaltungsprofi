@@ -1,5 +1,4 @@
 
-
 export enum AccountType {
   ASSET = 'ASSET',
   LIABILITY = 'LIABILITY',
@@ -9,8 +8,8 @@ export enum AccountType {
 }
 
 export enum ContactType {
-  CUSTOMER = 'CUSTOMER', // Debtor
-  VENDOR = 'VENDOR'      // Creditor
+  CUSTOMER = 'CUSTOMER',
+  VENDOR = 'VENDOR'
 }
 
 export enum TransactionType {
@@ -20,10 +19,10 @@ export enum TransactionType {
   CLOSING = 'CLOSING',
   CORRECTION = 'CORRECTION',
   DEPRECIATION = 'DEPRECIATION',
-  CREDIT_CARD = 'CREDIT_CARD'
+  CREDIT_CARD = 'CREDIT_CARD',
+  REVERSAL = 'REVERSAL'
 }
 
-// Added Account interface to fix "Module has no exported member Account" errors
 export interface Account {
   id: string;
   code: string;
@@ -33,41 +32,39 @@ export interface Account {
 }
 
 export interface CostCenter {
-    id: string;
-    code: string; 
-    name: string; 
-    description?: string;
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
 }
 
 export enum ProjectStatus {
-    PLANNING = 'PLANNING',
-    ACTIVE = 'ACTIVE',
-    COMPLETED = 'COMPLETED'
+  PLANNING = 'PLANNING',
+  ACTIVE = 'ACTIVE',
+  COMPLETED = 'COMPLETED'
 }
 
 export interface ProjectBudgetPosition {
-    accountId: string;
-    amount: number;
+  accountId: string;
+  amount: number;
 }
 
 export interface Project {
-    id: string;
-    code: string; 
-    name: string; 
-    status: ProjectStatus;
-    startDate: string;
-    endDate?: string;
-    budget?: number; 
-    budgetPlan?: ProjectBudgetPosition[]; 
-    description?: string;
+  id: string;
+  code: string;
+  name: string;
+  status: ProjectStatus;
+  startDate: string;
+  budget?: number;
+  budgetPlan?: ProjectBudgetPosition[];
 }
 
 export interface DunningLevelConfig {
-    title: string;
-    subjectTemplate: string;
-    bodyTemplate: string;
-    fee: number;
-    daysToPay: number;
+  title: string;
+  subjectTemplate: string;
+  bodyTemplate: string;
+  fee: number;
+  daysToPay: number;
 }
 
 export interface CompanySettings {
@@ -88,12 +85,13 @@ export interface CompanySettings {
   phone: string;
   website: string;
   dunningConfig?: {
-      level1: DunningLevelConfig;
-      level2: DunningLevelConfig;
-      level3: DunningLevelConfig;
+    level1: DunningLevelConfig;
+    level2: DunningLevelConfig;
+    level3: DunningLevelConfig;
   };
 }
 
+// Added ContactPerson interface
 export interface ContactPerson {
   name: string;
   role: string;
@@ -102,61 +100,36 @@ export interface ContactPerson {
 }
 
 export interface Contact {
-  id: string; // Kundennummer / Lieferantennummer
+  id: string;
   name: string;
   type: ContactType;
-  
-  // Identität & Kontakt
-  contactPersons?: ContactPerson[];
   email?: string;
   phone?: string;
+  // Added missing fields for Contact interface
   fax?: string;
   website?: string;
-
-  // Adresse
-  street?: string;
-  zip?: string;
   city?: string;
+  zip?: string;
+  street?: string;
   country?: string;
-
-  // Finanzen
-  paymentTermsDays?: number; // Zahlungsziel in Tagen
-  discountRate?: number;     // Skonto in %
-  discountDays?: number;     // Skontofrist in Tagen
-  creditLimit?: number;      // Kreditlimit in €
-  glAccount?: string;        // Zugeordnetes Debitoren/Kreditorenkonto (z.B. 1400 / 1600)
-
-  // Steuer
-  vatId?: string;           // USt-IdNr.
-  taxNumber?: string;       // Steuernummer
-  taxStatus?: 'DOMESTIC' | 'EU' | 'THIRD'; // Inland, EU, Drittland
-
-  // Bank
+  glAccount?: string;
   iban?: string;
   bic?: string;
   bankName?: string;
-  sepaMandateReference?: string; // SEPA-Mandatsreferenz
-  sepaMandateDate?: string;      // Datum des Mandats
-
-  // Lieferdetails (Primär Kreditoren)
-  deliveryTerms?: string;       // Lieferbedingungen (Incoterms etc.)
-  shippingMethod?: string;      // Bevorzugte Versandart
-  // Added preferredShippingMethod to fix type error in ContactForm.tsx
-  preferredShippingMethod?: string;
-  altDeliveryAddress?: string;  // Abweichende Lieferadresse
-
-  // Mahnwesen & Sperren
-  dunningLevel?: number;        // Aktuelle Mahnstufe
-  dunningRules?: string;        // Spezielle Mahnregeln
-  blockNote?: string;           // Sperrvermerk (z.B. "Nur Vorkasse")
+  vatId?: string;
+  taxStatus?: 'DOMESTIC' | 'EU' | 'THIRD';
   isBlocked?: boolean;
-
-  // Internes
+  category?: string;
   notes?: string;
-  category?: string;            // Kunden/Lieferanten-Kategorie
-  defaultCostCenterId?: string;
-  defaultProjectId?: string;
-  registerNumber?: string;      // HRB / HRA
+  paymentTermsDays?: number;
+  discountRate?: number;
+  discountDays?: number;
+  creditLimit?: number;
+  contactPersons?: ContactPerson[];
+  deliveryTerms?: string;
+  shippingMethod?: string;
+  altDeliveryAddress?: string;
+  sepaMandateReference?: string;
 }
 
 export interface JournalLine {
@@ -176,6 +149,11 @@ export interface Transaction {
   contactId?: string;
   lines: JournalLine[];
   invoiceId?: string;
+  isReversed?: boolean;
+  reversedBy?: string;
+  reversesId?: string;
+  stornoReason?: string;
+  // Added attachments field
   attachments?: string[];
 }
 
@@ -192,8 +170,28 @@ export interface Invoice {
   taxAmount: number;
   grossAmount: number;
   transactionId: string;
+  isReversed?: boolean;
   dunningLevel?: number;
-  lastDunningDate?: string;
+}
+
+export interface Asset {
+  id: string;
+  inventoryNumber: string;
+  name: string;
+  glAccountId: string;
+  purchaseDate: string;
+  cost: number;
+  usefulLifeYears: number;
+  status: 'ACTIVE' | 'SOLD' | 'SCRAPPED';
+  documentRef?: string;
+  afaCategory?: string;
+  residualValue?: number;
+}
+
+export interface ClientProfile {
+  id: string;
+  name: string;
+  created: string;
 }
 
 export enum PurchaseOrderStatus {
@@ -208,30 +206,9 @@ export interface PurchaseOrder {
   contactId: string;
   date: string;
   status: PurchaseOrderStatus;
-  offerNumber?: string;
-  orderNumber: string; 
+  orderNumber: string;
   description: string;
   netAmount: number;
+  offerNumber?: string;
   notes?: string;
-}
-
-export interface Asset {
-    id: string;
-    inventoryNumber: string;
-    name: string;
-    glAccountId: string;
-    purchaseDate: string;
-    documentRef?: string;
-    cost: number;
-    usefulLifeYears: number;
-    afaCategory?: string;
-    residualValue: number;
-    status: 'ACTIVE' | 'SOLD' | 'SCRAPPED';
-    location?: string;
-}
-
-export interface ClientProfile {
-    id: string;
-    name: string;
-    created: string;
 }

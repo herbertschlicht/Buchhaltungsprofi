@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
@@ -14,7 +13,7 @@ import { TransactionForm } from './components/TransactionForm';
 import { AIAssistantView } from './components/AIAssistantView';
 import { ControllingView } from './components/ControllingView';
 import { ClosingView } from './components/ClosingView';
-import { Account, AccountType, Contact, ContactType, Transaction, TransactionType, Invoice, PurchaseOrder, CompanySettings, Asset, ClientProfile, CostCenter, Project } from './types';
+import { Account, AccountType, Contact, ContactType, Transaction, TransactionType, Invoice, CompanySettings, Asset, ClientProfile, CostCenter, Project, PurchaseOrder } from './types';
 import { skr03Accounts } from './data/skr03';
 
 // --- INITIAL DATA SEEDING ---
@@ -124,7 +123,7 @@ const App: React.FC = () => {
           inv.id === originalInvoiceId ? { ...inv, isReversed: true } : inv
       ));
 
-      // 3. Optional: Ursprungstransaktion ebenfalls markieren
+      // 3. Verknüpfte Original-Transaktion ebenfalls markieren
       if (stornoTx.reversesId) {
           setTransactions(prev => prev.map(t => 
               t.id === stornoTx.reversesId ? { ...t, isReversed: true, reversedBy: stornoTx.id } : t
@@ -219,6 +218,7 @@ const App: React.FC = () => {
                 invoices={invoices}
                 companySettings={companySettings}
                 onSaveInvoice={handleSaveInvoice}
+                onUpdateInvoice={handleUpdateInvoice}
                 onAddContact={handleAddContact}
                 onSaveStorno={handleSaveStorno}
                 nextInvoiceNumber={nextInvoiceNum} 
