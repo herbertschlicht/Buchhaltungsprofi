@@ -20,7 +20,8 @@ import {
     Code,
     Cloud,
     Key,
-    Library
+    Library,
+    Layers
 } from 'lucide-react';
 
 declare const process: any;
@@ -50,10 +51,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => 
     },
     {
         id: 'archive',
-        label: 'Belegarchiv',
-        subLabel: 'Dokumentenverwaltung',
-        description: 'Suchen und Finden Sie alle Rechnungen (ER/RE) an einem zentralen Ort.',
-        icon: Library,
+        label: 'Zentralarchiv',
+        subLabel: 'Belegverwaltung',
+        description: 'Alle Rechnungen, Lohnbelege und Direktbuchungen an einem Ort finden.',
+        icon: Layers,
         targetTab: 'archive',
         color: 'bg-gradient-to-br from-indigo-400 to-indigo-600',
         textColor: 'text-indigo-600'
@@ -121,7 +122,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => 
                     </div>
                     <h1 className="text-3xl md:text-5xl font-black mb-4 tracking-tight">Übersicht & Schnellzugriff</h1>
                     <p className="text-blue-100 text-lg max-w-2xl font-light leading-relaxed">
-                        Verwalten Sie Ihre Finanzen effizient mit dem integrierten Belegarchiv und KI-Unterstützung.
+                        Verwalten Sie Ihre Finanzen effizient mit dem neuen Universal-Archiv und KI-Unterstützung.
                     </p>
                 </div>
                 <div className="hidden md:block text-right">
@@ -205,12 +206,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => 
                   <div className="space-y-8">
                       <div className="flex gap-4 group">
                           <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shrink-0">
-                              <Library className="w-5 h-5"/>
+                              <Layers className="w-5 h-5"/>
                           </div>
                           <div>
-                              <h4 className="font-bold text-slate-800 text-lg">Belege finden</h4>
+                              <h4 className="font-bold text-slate-800 text-lg">Universal-Archiv</h4>
                               <p className="text-slate-600 text-sm leading-relaxed mt-1">
-                                  Nutzen Sie das <strong>Zentrale Archiv</strong>, um Belege zu suchen, Buchungssätze zu prüfen oder Korrekturbuchungen (Storno) einzuleiten.
+                                  Nutzen Sie das <strong>Zentralarchiv</strong>, um Belege zu suchen, Buchungssätze zu prüfen oder Korrekturbuchungen (Storno) einzuleiten. Es umfasst alle Belegarten.
                               </p>
                           </div>
                       </div>
@@ -220,9 +221,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => 
                               <History className="w-5 h-5"/>
                           </div>
                           <div>
-                              <h4 className="font-bold text-slate-800 text-lg">Fehler korrigieren (Storno)</h4>
+                              <h4 className="font-bold text-slate-800 text-lg">Korrekturen (Storno)</h4>
                               <p className="text-slate-600 text-sm leading-relaxed mt-1">
-                                  Haben Sie sich verbucht? Öffnen Sie den Beleg im Archiv und klicken Sie auf das <strong>History-Icon</strong>. Das System führt automatisch ein rechtssicheres Generalstorno durch.
+                                  Fehler korrigieren Sie rechtssicher im Archiv über das <strong>History-Icon</strong>. Das System führt automatisch ein Generalstorno durch.
                               </p>
                           </div>
                       </div>
@@ -232,7 +233,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, metrics }) => 
                         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-32 h-32 bg-white opacity-10 rounded-full"></div>
                         <h4 className="text-xl font-black mb-3">Tipp vom AI-Coach</h4>
                         <p className="text-indigo-100 text-sm leading-relaxed mb-6 italic">
-                            "Wusstest du? Du kannst Belege einfach fotografieren und im Belegarchiv oder beim Erfassen hochladen. Mein Smart-Scan erkennt Beträge und Partner automatisch!"
+                            "Im Zentralarchiv findest du jetzt wirklich ALLES. Egal ob du eine manuelle Buchung im Hauptbuch gemacht hast oder einen Gehaltslauf – jeder Beleg bekommt automatisch eine Identität."
                         </p>
                         <button onClick={() => setActiveTab('ai-coach')} className="bg-white text-indigo-600 px-6 py-2 rounded-xl font-bold text-sm w-fit hover:bg-indigo-50 transition-colors">Jetzt Coach fragen</button>
                   </div>
