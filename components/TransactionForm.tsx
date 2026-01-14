@@ -1,18 +1,29 @@
+
 import React, { useState, useEffect } from 'react';
-import { Account, Contact, Transaction, Invoice, TransactionType } from '../types';
+import { Account, Contact, Transaction, Invoice, TransactionType, CostCenter, Project } from '../types';
 import { X, Plus, Trash2, Wand2, Receipt, Tags, Paperclip, FileSpreadsheet, FileText, File, Calculator } from 'lucide-react';
 import { suggestTransactionCategory } from '../services/geminiService';
 
 interface TransactionFormProps {
   accounts: Account[];
-  contacts: Contact[];
+  contacts?: Contact[]; // Make optional if App.tsx doesn't pass it
+  costCenters?: CostCenter[]; // Added missing prop
+  projects?: Project[]; // Added missing prop
   invoices?: Invoice[]; 
   existingTransactions?: Transaction[]; 
   onSave: (transaction: Transaction) => void;
   onClose: () => void;
 }
 
-export const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, existingTransactions = [], onSave, onClose }) => {
+export const TransactionForm: React.FC<TransactionFormProps> = ({ 
+    accounts, 
+    contacts = [],
+    costCenters = [], 
+    projects = [],
+    existingTransactions = [], 
+    onSave, 
+    onClose 
+}) => {
   // State
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [transactionType, setTransactionType] = useState<TransactionType>(TransactionType.STANDARD);

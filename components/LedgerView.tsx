@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Transaction, Account, AccountType, CompanySettings, Invoice } from '../types';
 import { Search, PenLine, Check, X, FileSpreadsheet, List, Wallet, Calendar, Printer, Building2, Filter, AlertTriangle, ArrowLeft, ArrowRight } from 'lucide-react';
@@ -9,9 +10,18 @@ interface LedgerViewProps {
   invoices?: Invoice[]; // Optional, but needed for looking up Beleg-Nr
   companySettings: CompanySettings; // New Prop
   onUpdateAccount?: (account: Account) => void;
+  // Add missing onAddAccount prop
+  onAddAccount?: (account: Account) => void;
 }
 
-export const LedgerView: React.FC<LedgerViewProps> = ({ transactions, accounts, invoices = [], companySettings, onUpdateAccount }) => {
+export const LedgerView: React.FC<LedgerViewProps> = ({ 
+    transactions, 
+    accounts, 
+    invoices = [], 
+    companySettings, 
+    onUpdateAccount,
+    onAddAccount // Destructure missing prop
+}) => {
   const [activeSubTab, setActiveSubTab] = useState<'journal' | 'accounts' | 'balances'>('journal');
   const [searchTerm, setSearchTerm] = useState('');
   const [showEmptyAccounts, setShowEmptyAccounts] = useState(false);

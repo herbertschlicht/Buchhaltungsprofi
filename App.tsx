@@ -17,30 +17,55 @@ import { ClosingView } from './components/ClosingView';
 import { Account, AccountType, Contact, ContactType, Transaction, TransactionType, Invoice, CompanySettings, Asset, ClientProfile, CostCenter, Project, PurchaseOrder } from './types';
 import { skr03Accounts } from './data/skr03';
 
-// Initialisierungsdaten
+// --- INITIAL DATA SEEDING ---
 const initialAccounts: Account[] = skr03Accounts;
+
 const initialCompanySettings: CompanySettings = {
-  companyName: 'BuchhaltungsProfi Demo',
+  companyName: 'LedgerLens Demo Corp',
   ceo: 'Max Mustermann',
-  street: 'Beispielweg 10',
+  street: 'Musterstraße 1',
   zip: '10115',
   city: 'Berlin',
   country: 'Deutschland',
   taxNumber: '12/345/67890',
   vatId: 'DE123456789',
-  registerCourt: 'Amtsgericht Berlin',
-  registerNumber: 'HRB 99999',
-  bankName: 'Berliner Bank',
-  iban: 'DE99 1234 5678 9012 3456 78',
-  bic: 'BERLDEF1XXX',
-  email: 'info@buchhaltungsprofi.de',
+  registerCourt: 'Amtsgericht Berlin-Charlottenburg',
+  registerNumber: 'HRB 12345',
+  bankName: 'Berliner Volksbank',
+  iban: 'DE99 1001 0010 1234 5678 90',
+  bic: 'GENODEF1BRL',
+  email: 'buchhaltung@ledgerlens.de',
   phone: '030 / 123 456 78',
-  website: 'www.buchhaltungsprofi.de'
+  website: 'www.ledgerlens.de',
+  
+  dunningConfig: {
+      level1: {
+          title: "Zahlungserinnerung",
+          subjectTemplate: "Zahlungserinnerung zur Rechnung Nr. [NR]",
+          bodyTemplate: `sehr geehrte Damen und Herren,\n\nsicherlich haben Sie in der Hektik des Alltags übersehen, unsere Rechnung Nr. [NR] vom [DATUM] zu begleichen.\n\nWir bitten Sie, den fälligen Betrag in Höhe von [BETRAG] € bis zum [FRIST] auf unser unten genanntes Konto zu überweisen.\n\nSollten Sie die Zahlung inzwischen geleistet haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.`,
+          fee: 0.00,
+          daysToPay: 7
+      },
+      level2: {
+          title: "1. Mahnung",
+          subjectTemplate: "1. Mahnung zur Rechnung Nr. [NR]",
+          bodyTemplate: `sehr geehrte Damen und Herren,\n\nleider konnten wir bis heute keinen Zahlungseingang für unsere Rechnung Nr. [NR] feststellen. Auch auf unsere Zahlungserinnerung haben Sie nicht reagiert.\n\nWir bitten Sie nunmehr nachdrücklich, den offenen Betrag zuzüglich einer Mahngebühr von [GEBUEHR] € sofort zu überweisen.\n\nGesamtbetrag fällig: [GESAMT] €`,
+          fee: 5.00,
+          daysToPay: 5
+      },
+      level3: {
+          title: "Letzte Mahnung",
+          subjectTemplate: "LETZTE MAHNUNG zur Rechnung Nr. [NR]",
+          bodyTemplate: `sehr geehrte Damen und Herren,\n\nda Sie auf unsere bisherigen Schreiben nicht reagiert haben, fordern wir Sie hiermit letztmalig auf, den fälligen Gesamtbetrag bis zum [FRIST] zu begleichen.\n\nSollte der Betrag nicht fristgerecht eingehen, werden wir die Forderung ohne weitere Ankündigung an unser Inkassobüro übergeben. Die hierdurch entstehenden Mehrkosten gehen zu Ihren Lasten.\n\nMahngebühr: [GEBUEHR] €\nGesamtbetrag fällig: [GESAMT] €`,
+          fee: 10.00,
+          daysToPay: 3
+      }
+  }
 };
 
 const initialContacts: Contact[] = [
   { id: 'D10000', name: 'Müller Bau GmbH', type: ContactType.CUSTOMER, city: 'München', glAccount: '1400000' },
-  { id: 'K70000', name: 'Baustoff SE', type: ContactType.VENDOR, city: 'Hamburg', glAccount: '1600000' }
+  { id: 'K70000', name: 'Baustoff-Union SE', type: ContactType.VENDOR, city: 'Hamburg', glAccount: '1600000' }
 ];
 
 function useStickyState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
@@ -91,10 +116,15 @@ const App: React.FC = () => {
   };
 
   const handleSaveStorno = (stornoTx: Transaction, originalInvoiceId: string) => {
+      // 1. Storno-Transaktion speichern
       setTransactions(prev => [stornoTx, ...prev]);
+      
+      // 2. Original-Rechnung als storniert markieren
       setInvoices(prev => prev.map(inv => 
           inv.id === originalInvoiceId ? { ...inv, isReversed: true } : inv
       ));
+
+      // 3. Verknüpfte Original-Transaktion ebenfalls markieren
       if (stornoTx.reversesId) {
           setTransactions(prev => prev.map(t => 
               t.id === stornoTx.reversesId ? { ...t, isReversed: true, reversedBy: stornoTx.id } : t
@@ -145,6 +175,7 @@ const App: React.FC = () => {
             invoices={invoices} 
             companySettings={companySettings}
             onUpdateAccount={handleUpdateAccount}
+            // fix: onAddAccount is now added to LedgerViewProps
             onAddAccount={(acc) => setAccounts([...accounts, acc])}
           />
         );
@@ -232,6 +263,7 @@ const App: React.FC = () => {
       {showTransactionModal && (
         <TransactionForm 
           accounts={accounts}
+          // costCenters and projects are now added to TransactionFormProps
           costCenters={costCenters}
           projects={projects}
           existingTransactions={transactions}

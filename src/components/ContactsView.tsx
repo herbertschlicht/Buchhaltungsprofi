@@ -17,7 +17,9 @@ import {
     TrendingUp,
     Ban,
     CheckCircle,
-    History
+    History,
+    Archive,
+    ArrowRight
 } from 'lucide-react';
 import { InvoiceForm } from './InvoiceForm';
 import { ContactForm } from './ContactForm';
@@ -36,7 +38,7 @@ interface ContactsViewProps {
   onSavePurchaseOrder?: (order: PurchaseOrder, transaction?: Transaction, invoice?: Invoice) => void;
   onUpdateInvoice?: (updatedInvoice: Invoice) => void;
   onAddContact?: (contact: Contact) => void; 
-  onSaveStorno?: (stornoTx: Transaction, originalInvoiceId: string) => void; // Neu
+  onSaveStorno?: (stornoTx: Transaction, originalInvoiceId: string) => void;
   nextInvoiceNumber?: string;
   nextOrderNumber?: string;
   nextAssetId?: string; 
@@ -76,15 +78,19 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       c.id.includes(searchTerm)
   ).sort((a,b) => a.name.localeCompare(b.name));
 
-  const oposList = invoices.map(inv => {
+  const fullInvoiceArchive = invoices.filter(inv => {
+      const contact = contacts.find(c => c.id === inv.contactId);
+      const matchesType = contact?.type === (viewMode === 'debtors' ? ContactType.CUSTOMER : ContactType.VENDOR);
+      const matchesSearch = inv.number.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                           contact?.name.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesType && matchesSearch;
+  }).map(inv => {
       const stats = getInvoicePaymentStatus(inv, transactions);
       const contact = contacts.find(c => c.id === inv.contactId);
       return { ...inv, ...stats, contactName: contact?.name };
-  }).filter(item => {
-      const contact = contacts.find(c => c.id === item.contactId);
-      if (contact?.type !== (viewMode === 'debtors' ? ContactType.CUSTOMER : ContactType.VENDOR)) return false;
-      return item.status !== 'PAID' && item.status !== 'CREDIT_NOTE' && !item.isReversed;
-  }).sort((a,b) => a.dueDate.localeCompare(b.dueDate));
+  }).sort((a, b) => b.date.localeCompare(a.date));
+
+  const oposList = fullInvoiceArchive.filter(item => item.status !== 'PAID' && item.status !== 'CREDIT_NOTE' && !item.isReversed);
 
   const calculateTotalDue = () => {
       return relevantContacts.reduce((acc, c) => acc + getContactBalance(c.id, transactions, accounts), 0);
@@ -126,6 +132,9 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
           <button onClick={() => setActiveTab('opos')} className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center whitespace-nowrap ${activeTab === 'opos' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
               <ListChecks className="w-4 h-4 mr-2"/> OPOS-Liste
           </button>
+          <button onClick={() => setActiveTab('invoices')} className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center whitespace-nowrap ${activeTab === 'invoices' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <Archive className="w-4 h-4 mr-2"/> Rechnungsarchiv
+          </button>
           <button onClick={() => setActiveTab('list')} className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center whitespace-nowrap ${activeTab === 'list' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
               <Database className="w-4 h-4 mr-2"/> Stammdaten
           </button>
@@ -137,37 +146,80 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
           
           {activeTab === 'cockpit' && (
-              <div className="p-8">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                      <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
-                          <p className="text-slate-500 text-sm font-medium uppercase">{viewMode === 'debtors' ? 'Offene Forderungen' : 'Offene Verbindlichkeiten'}</p>
-                          <p className="text-3xl font-bold text-slate-800 mt-2">{calculateTotalDue().toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</p>
+              <div className="p-8 animate-fadeIn">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                      {/* Status KPI Card */}
+                      <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center">
+                          <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">{viewMode === 'debtors' ? 'Offene Forderungen' : 'Offene Verbindlichkeiten'}</p>
+                          <p className="text-3xl font-black text-slate-800 mt-2">{calculateTotalDue().toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</p>
                       </div>
-                      <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 flex flex-col justify-center items-start">
-                          <p className="text-blue-600 text-sm font-medium uppercase mb-3">Rechnungswesen</p>
-                          <button 
-                                onClick={() => setShowInvoiceForm(true)}
-                                className={`w-full flex items-center justify-center px-4 py-3 text-white rounded-lg font-bold shadow-md transition-all hover:scale-105 ${viewMode === 'debtors' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'}`}
-                            >
-                                <PlusCircle className="w-5 h-5 mr-2" />
-                                {viewMode === 'debtors' ? 'Neue Ausgangsrechnung' : 'Neue Eingangsrechnung'}
-                            </button>
-                      </div>
-                      <div className="bg-red-50 p-6 rounded-xl border border-red-100 flex flex-col justify-center items-start">
-                        <p className="text-red-600 text-sm font-medium uppercase mb-3">Korrekturen</p>
-                        <button 
-                                onClick={() => openStorno()}
-                                className="w-full flex items-center justify-center px-4 py-2 bg-white border border-red-200 text-red-700 hover:bg-red-50 rounded-lg font-bold transition-all shadow-sm"
-                            >
-                                <History className="w-4 h-4 mr-2"/> Generalstorno buchen
-                            </button>
+
+                      {/* Action: New Invoice */}
+                      <button 
+                        onClick={() => setShowInvoiceForm(true)}
+                        className={`p-6 rounded-2xl text-white flex flex-col justify-between items-start transition-all hover:scale-[1.02] shadow-lg ${viewMode === 'debtors' ? 'bg-blue-600 shadow-blue-100' : 'bg-orange-600 shadow-orange-100'}`}
+                      >
+                        <PlusCircle className="w-8 h-8 mb-4 opacity-80" />
+                        <div className="text-left">
+                            <p className="font-bold text-lg leading-tight">{viewMode === 'debtors' ? 'Ausgangsrechnung' : 'Eingangsrechnung'}</p>
+                            <p className="text-[10px] opacity-80 uppercase font-bold mt-1">Neu erfassen</p>
+                        </div>
+                      </button>
+
+                      {/* Action: Open Archive (Der neue Button) */}
+                      <button 
+                        onClick={() => setActiveTab('invoices')}
+                        className="p-6 bg-white border-2 border-slate-100 rounded-2xl flex flex-col justify-between items-start transition-all hover:border-indigo-200 hover:bg-indigo-50 group shadow-sm hover:shadow-md"
+                      >
+                        <Archive className="w-8 h-8 mb-4 text-indigo-600 group-hover:scale-110 transition-transform" />
+                        <div className="text-left">
+                            <p className="font-bold text-lg text-slate-800 leading-tight">Belegarchiv</p>
+                            <p className="text-[10px] text-slate-400 uppercase font-bold mt-1 group-hover:text-indigo-600 flex items-center">Alle Rechnungen <ArrowRight className="w-3 h-3 ml-1" /></p>
+                        </div>
+                      </button>
+
+                      {/* Action: Storno */}
+                      <button 
+                        onClick={() => openStorno()}
+                        className="p-6 bg-rose-50 border-2 border-rose-100 rounded-2xl flex flex-col justify-between items-start transition-all hover:bg-rose-100 group shadow-sm hover:shadow-md"
+                      >
+                        <History className="w-8 h-8 mb-4 text-rose-600 group-hover:rotate-[-45deg] transition-transform" />
+                        <div className="text-left">
+                            <p className="font-bold text-lg text-rose-900 leading-tight">Generalstorno</p>
+                            <p className="text-[10px] text-rose-400 uppercase font-bold mt-1">Buchung heilen</p>
+                        </div>
+                      </button>
+                  </div>
+
+                  {/* Recent Activity Mini-List */}
+                  <div className="bg-slate-50/50 border border-slate-200 rounded-2xl p-6">
+                      <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-blue-600" /> Zuletzt fällig
+                      </h3>
+                      <div className="space-y-3">
+                          {oposList.slice(0, 3).map(inv => (
+                              <div key={inv.id} className="bg-white p-3 rounded-xl border border-slate-100 flex justify-between items-center shadow-sm">
+                                  <div className="flex gap-4 items-center">
+                                      <span className="font-mono text-xs font-bold text-slate-400">{inv.number}</span>
+                                      <span className="font-bold text-sm text-slate-700">{inv.contactName}</span>
+                                  </div>
+                                  <div className="flex items-center gap-4">
+                                      <span className="text-xs text-red-500 font-medium">Fällig: {new Date(inv.dueDate).toLocaleDateString('de-DE')}</span>
+                                      <span className="font-mono font-bold text-slate-800">{inv.remainingAmount.toLocaleString('de-DE', {minimumFractionDigits:2})} €</span>
+                                  </div>
+                              </div>
+                          ))}
+                          {oposList.length === 0 && <p className="text-sm text-slate-400 italic">Keine überfälligen Posten.</p>}
+                          {oposList.length > 3 && (
+                              <button onClick={() => setActiveTab('opos')} className="text-xs font-bold text-blue-600 hover:underline px-1">+ {oposList.length - 3} weitere offene Posten anzeigen</button>
+                          )}
                       </div>
                   </div>
               </div>
           )}
           
           {activeTab === 'opos' && (
-              <div className="overflow-auto flex-1">
+              <div className="overflow-auto flex-1 animate-fadeIn">
                   <table className="w-full text-left">
                       <thead className="bg-slate-100 text-[10px] text-slate-500 uppercase font-semibold border-b border-slate-200">
                           <tr>
@@ -207,8 +259,52 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
               </div>
           )}
 
+          {activeTab === 'invoices' && (
+              <div className="flex flex-col h-full animate-fadeIn">
+                  <div className="p-4 border-b border-slate-100 flex gap-4 bg-slate-50/50">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                            <input type="text" placeholder="Suche im Archiv..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500"/>
+                        </div>
+                  </div>
+                  <div className="overflow-auto flex-1">
+                      <table className="w-full text-left">
+                          <thead className="bg-slate-50 text-[10px] text-slate-400 uppercase font-black border-b border-slate-200">
+                              <tr>
+                                  <th className="p-4">Status</th>
+                                  <th className="p-4">Beleg-Nr.</th>
+                                  <th className="p-4">Datum</th>
+                                  <th className="p-4">Geschäftspartner</th>
+                                  <th className="p-4 text-right">Betrag (Brutto)</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                              {fullInvoiceArchive.map(inv => (
+                                  <tr key={inv.id} className={`hover:bg-slate-50 transition-colors ${inv.isReversed ? 'bg-rose-50/30' : ''}`}>
+                                      <td className="p-4 text-xs">
+                                          {inv.isReversed ? (
+                                              <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold uppercase text-[9px]">Storniert</span>
+                                          ) : inv.status === 'PAID' ? (
+                                              <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold uppercase text-[9px]">Bezahlt</span>
+                                          ) : (
+                                              <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase text-[9px]">Offen</span>
+                                          )}
+                                      </td>
+                                      <td className="p-4 font-mono font-bold text-slate-600 text-xs">{inv.number}</td>
+                                      <td className="p-4 text-xs text-slate-500">{new Date(inv.date).toLocaleDateString('de-DE')}</td>
+                                      <td className="p-4 font-bold text-slate-800 text-sm">{inv.contactName}</td>
+                                      <td className={`p-4 text-right font-mono font-bold ${inv.isReversed ? 'text-slate-300 line-through' : 'text-slate-900'}`}>{inv.grossAmount.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
+                                  </tr>
+                              ))}
+                              {fullInvoiceArchive.length === 0 && <tr><td colSpan={5} className="p-12 text-center text-slate-400 italic">Keine Belege gefunden.</td></tr>}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          )}
+
           {activeTab === 'list' && (
-              <div className="flex flex-col h-full">
+              <div className="flex flex-col h-full animate-fadeIn">
                   <div className="p-4 border-b border-slate-100 flex gap-4 bg-slate-50/50">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -226,7 +322,6 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                                    <th className="p-4">Name / Firma</th>
                                    <th className="p-4">Ort / Kontakt</th>
                                    <th className="p-4">Finanzen</th>
-                                   <th className="p-4">Steuer / Bank</th>
                                    <th className="p-4 text-center">Status</th>
                                </tr>
                            </thead>
@@ -246,17 +341,10 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                                             <div className="flex gap-2">
                                                 <span className="text-slate-400 w-12">Ziel:</span> <span className="font-bold">{contact.paymentTermsDays || 0} Tage</span>
                                             </div>
-                                            <div className="flex gap-2">
-                                                <span className="text-slate-400 w-12">Konto:</span> <span className="font-mono">{contact.glAccount || '-'}</span>
-                                            </div>
-                                       </td>
-                                       <td className="p-4 text-[11px]">
-                                            <div className="font-mono text-slate-500">{contact.vatId || 'Keine USt-ID'}</div>
-                                            <div className="text-slate-400 mt-0.5 truncate max-w-[150px]">{contact.iban || 'Keine Bankdaten'}</div>
                                        </td>
                                        <td className="p-4 text-center">
                                             {contact.isBlocked ? (
-                                                <div className="flex flex-col items-center" title={contact.blockNote}>
+                                                <div className="flex flex-col items-center">
                                                     <Ban className="w-5 h-5 text-red-500"/>
                                                     <span className="text-[9px] font-bold text-red-600 uppercase mt-0.5">Gesperrt</span>
                                                 </div>
@@ -276,10 +364,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
           )}
 
           {activeTab === 'balances' && (
-              <div className="p-8 text-center text-slate-400">... Saldenliste per Stichtag ...</div>
-          )}
-          {activeTab === 'invoices' && (
-              <div className="p-8 text-center text-slate-400 italic">... Vollständiges Rechnungsarchiv ...</div>
+              <div className="p-8 text-center text-slate-400 italic">... Saldenliste per Stichtag wird berechnet ...</div>
           )}
 
       </div>
@@ -313,7 +398,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
 
       {showStornoForm && onSaveStorno && (
           <StornoForm 
-            contact={selectedContact || contacts.filter(c => c.type === (viewMode === 'debtors' ? 'CUSTOMER' : 'VENDOR'))[0]}
+            contact={selectedContact || relevantContacts[0]}
             invoices={invoices}
             transactions={transactions}
             onSave={(stornoTx, originalId) => {
